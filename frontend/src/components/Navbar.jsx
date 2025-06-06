@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Disclosure } from '@headlessui/react';
 import { Bars3Icon, XMarkIcon, BellIcon } from '@heroicons/react/24/outline';
@@ -7,6 +7,7 @@ import schoolLogo from '../assets/logo.png';
 
 const Navbar = () => {
   const { user, logout } = useAuth();
+  const location = useLocation();
 
   const navigation = user
     ? [
@@ -51,13 +52,19 @@ const Navbar = () => {
                 <div className="hidden sm:flex sm:flex-1 sm:justify-center">
                   <div className="flex space-x-2">
                     {navigation.map((item) => (
-                      <Link
+                      <NavLink
                         key={item.name}
                         to={item.href}
-                        className="px-3 py-2 text-sm font-medium text-gray-700 hover:text-red-800 hover:bg-gray-100 rounded-md transition-colors duration-150"
+                        className={({ isActive }) =>
+                          `px-3 py-2 text-sm font-medium rounded-md transition-all duration-200 ease-in-out
+                          ${isActive 
+                            ? 'text-red-900 bg-red-50 hover:bg-red-100 shadow-sm' 
+                            : 'text-gray-700 hover:text-red-800 hover:bg-gray-100'
+                          }`
+                        }
                       >
                         {item.name}
-                      </Link>
+                      </NavLink>
                     ))}
                   </div>
                 </div>
@@ -67,7 +74,7 @@ const Navbar = () => {
                   <div className="hidden sm:flex sm:items-center">
                     <button
                       onClick={logout}
-                      className="ml-4 px-4 py-2 text-sm font-medium text-gray-700 hover:text-red-800 hover:bg-gray-100 rounded-md transition-colors duration-150"
+                      className="ml-4 px-4 py-2 text-sm font-medium text-gray-700 hover:text-red-800 hover:bg-gray-100 rounded-md transition-all duration-200 ease-in-out"
                     >
                       Logout
                     </button>
@@ -80,18 +87,24 @@ const Navbar = () => {
             <Disclosure.Panel className="sm:hidden">
               <div className="space-y-1 px-2 pb-3 pt-2">
                 {navigation.map((item) => (
-                  <Link
+                  <NavLink
                     key={item.name}
                     to={item.href}
-                    className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-red-800 hover:bg-gray-100 rounded-md"
+                    className={({ isActive }) =>
+                      `block px-3 py-2 text-base font-medium rounded-md transition-all duration-200 ease-in-out
+                      ${isActive 
+                        ? 'text-red-900 bg-red-50 hover:bg-red-100' 
+                        : 'text-gray-700 hover:text-red-800 hover:bg-gray-100'
+                      }`
+                    }
                   >
                     {item.name}
-                  </Link>
+                  </NavLink>
                 ))}
                 {user && (
                   <button
                     onClick={logout}
-                    className="mt-2 block w-full px-3 py-2 text-base font-medium text-gray-700 hover:text-red-800 hover:bg-gray-100 rounded-md text-left"
+                    className="mt-2 block w-full px-3 py-2 text-base font-medium text-gray-700 hover:text-red-800 hover:bg-gray-100 rounded-md text-left transition-all duration-200 ease-in-out"
                   >
                     Logout
                   </button>

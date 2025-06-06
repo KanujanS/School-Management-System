@@ -2,30 +2,42 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { mockApi } from '../../services/mockData';
 import ImageSlider from '../../components/ImageSlider';
+import {
+  AcademicCapIcon,
+  UserCircleIcon,
+  BookOpenIcon,
+} from '@heroicons/react/24/outline';
 
 const StudentDashboard = () => {
   const { user } = useAuth();
+  const [studentData, setStudentData] = useState(null);
   const [assignments, setAssignments] = useState([]);
-  const [attendance, setAttendance] = useState([]);
   const [marks, setMarks] = useState([]);
   const [notifications, setNotifications] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        const [assignmentsData, attendanceData, marksData, notificationsData] = await Promise.all([
+        setIsLoading(true);
+        // Fetch student's personal data
+        const studentDetails = await mockApi.getStudentDetails(user.id);
+        setStudentData(studentDetails);
+
+        // Fetch other dashboard data
+        const [assignmentsData, marksData, notificationsData] = await Promise.all([
           mockApi.getAssignments('student', user.id),
-          mockApi.getAttendance(user.id),
           mockApi.getMarks(user.id),
-          mockApi.getNotifications('student'),
+          mockApi.getNotifications('student', user.id), // Only get notifications for this student
         ]);
 
-        setAssignments(assignmentsData);
-        setAttendance(attendanceData);
-        setMarks(marksData);
-        setNotifications(notificationsData);
+        setAssignments(assignmentsData.filter(a => a.studentId === user.id));
+        setMarks(marksData.filter(m => m.studentId === user.id));
+        setNotifications(notificationsData.filter(n => n.studentId === user.id));
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
+      } finally {
+        setIsLoading(false);
       }
     };
 
@@ -34,13 +46,13 @@ const StudentDashboard = () => {
     }
   }, [user]);
 
-  // If user is not loaded yet, show loading state
-  if (!user) {
+  // If loading or user not loaded yet, show loading state
+  if (isLoading || !user) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-800 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
+          <p className="mt-4 text-gray-600">Loading your dashboard...</p>
         </div>
       </div>
     );
@@ -61,10 +73,41 @@ const StudentDashboard = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {/* Student Information Card */}
+      <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="flex items-start justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900 flex items-center">
+              <UserCircleIcon className="h-6 w-6 mr-2 text-red-800" />
+              Personal Information
+            </h2>
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-gray-500">Student ID</p>
+                <p className="font-medium">{studentData?.studentId || user.id}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Class</p>
+                <p className="font-medium">{studentData?.class}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Grade</p>
+                <p className="font-medium">{studentData?.grade}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Section</p>
+                <p className="font-medium">{studentData?.section}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Recent Assignments */}
         <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
+            <BookOpenIcon className="h-6 w-6 mr-2 text-blue-600" />
             Recent Assignments
           </h2>
           <div className="space-y-4">
@@ -77,47 +120,24 @@ const StudentDashboard = () => {
                 <p className="text-sm text-gray-500">
                   Due: {new Date(assignment.dueDate).toLocaleDateString()}
                 </p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Attendance Overview */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">
-            Attendance Overview
-          </h2>
-          <div className="space-y-4">
-            {attendance.slice(0, 3).map((record) => (
-              <div
-                key={record.id}
-                className={`border-l-4 pl-4 py-2 ${
-                  record.status === 'present'
-                    ? 'border-green-500'
-                    : 'border-red-500'
-                }`}
-              >
-                <h3 className="font-medium text-gray-900">{record.subject}</h3>
                 <p className="text-sm text-gray-500">
-                  {new Date(record.date).toLocaleDateString()} -{' '}
-                  <span
-                    className={
-                      record.status === 'present'
-                        ? 'text-green-600'
-                        : 'text-red-600'
-                    }
-                  >
-                    {record.status.charAt(0).toUpperCase() + record.status.slice(1)}
-                  </span>
+                  Status: {assignment.submitted ? 
+                    <span className="text-green-600">Submitted</span> : 
+                    <span className="text-yellow-600">Pending</span>
+                  }
                 </p>
               </div>
             ))}
+            {assignments.length === 0 && (
+              <p className="text-gray-500 text-sm">No recent assignments</p>
+            )}
           </div>
         </div>
 
         {/* Recent Marks */}
         <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
+            <AcademicCapIcon className="h-6 w-6 mr-2 text-purple-600" />
             Recent Marks
           </h2>
           <div className="space-y-4">
@@ -133,8 +153,14 @@ const StudentDashboard = () => {
                   Score: {mark.value}/{mark.totalMarks} (
                   {((mark.value / mark.totalMarks) * 100).toFixed(1)}%)
                 </p>
+                <p className="text-sm text-gray-500">
+                  Grade: <span className="font-medium">{mark.grade}</span>
+                </p>
               </div>
             ))}
+            {marks.length === 0 && (
+              <p className="text-gray-500 text-sm">No recent marks</p>
+            )}
           </div>
         </div>
       </div>
@@ -145,7 +171,7 @@ const StudentDashboard = () => {
           Recent Notifications
         </h2>
         <div className="space-y-4">
-          {notifications.map((notification) => (
+          {notifications.slice(0, 5).map((notification) => (
             <div
               key={notification.id}
               className="flex items-start space-x-4 border-b border-gray-200 pb-4"
@@ -159,6 +185,9 @@ const StudentDashboard = () => {
               </div>
             </div>
           ))}
+          {notifications.length === 0 && (
+            <p className="text-gray-500 text-sm">No new notifications</p>
+          )}
         </div>
       </div>
     </div>

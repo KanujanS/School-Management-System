@@ -1,61 +1,120 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { mockApi } from '../../services/mockData';
-import {
-  UserGroupIcon,
-  CheckCircleIcon,
-  XCircleIcon,
-  CalendarIcon,
-} from '@heroicons/react/24/outline';
+import { PlusIcon, CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline';
+import AddAttendance from '../../components/AddAttendance';
 
 const Attendance = () => {
   const { user } = useAuth();
-  const [attendance, setAttendance] = useState([]);
+  const [studentData, setStudentData] = useState(null);
+  const [attendanceData, setAttendanceData] = useState([]);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-  const [filter, setFilter] = useState('all');
+  const [selectedClass, setSelectedClass] = useState('all');
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Predefined list of all classes
+  const allClasses = [
+    // O/L Classes (Grade 6-11)
+    ...[6, 7, 8, 9, 10, 11].flatMap(grade => 
+      ['A', 'B', 'C', 'D', 'E', 'F'].map(division => `Grade ${grade}-${division}`)
+    ),
+    // A/L Classes with detailed streams
+    'A/L Physical Science',
+    'A/L Biological Science',
+    'A/L Bio Technology',
+    'A/L Engineering Technology',
+    'A/L Commerce',
+    'A/L Arts'
+  ];
 
   useEffect(() => {
-    const fetchAttendance = async () => {
+    const fetchData = async () => {
       try {
-        const data = await mockApi.getAttendance(user.role, user.id, selectedDate);
-        setAttendance(data || []);
+        setIsLoading(true);
+        
+        // Fetch student's personal data if user is a student
+        if (user.role === 'student') {
+          const studentDetails = await mockApi.getStudentDetails(user.id);
+          setStudentData(studentDetails);
+        }
+
+        // Fetch attendance data
+        const data = await mockApi.getAttendance(user.role, user.id);
+        
+        // Filter attendance data for specific student if user is a student
+        const filteredData = user.role === 'student'
+          ? data.filter(record => record.studentId === user.id)
+          : data;
+
+        setAttendanceData(filteredData);
       } catch (error) {
-        console.error('Error fetching attendance:', error);
+        console.error('Error fetching data:', error);
+      } finally {
+        setIsLoading(false);
       }
     };
 
-    fetchAttendance();
-  }, [user.role, user.id, selectedDate]);
+    if (user) {
+      fetchData();
+    }
+  }, [user]);
 
-  const handleMarkAttendance = async (studentId, status) => {
+  // Calculate attendance summary for student
+  const calculateAttendanceSummary = () => {
+    const totalDays = attendanceData.length;
+    const presentDays = attendanceData.filter(record => record.status === 'present').length;
+    const absentDays = totalDays - presentDays;
+    const presentPercentage = totalDays > 0 ? ((presentDays / totalDays) * 100).toFixed(1) : 0;
+
+    return {
+      totalDays,
+      presentDays,
+      absentDays,
+      presentPercentage
+    };
+  };
+
+  // Handle adding new attendance record
+  const handleAddAttendance = async (newAttendance) => {
     try {
-      // In a real app, this would make an API call to update attendance
-      const updatedAttendance = attendance.map((record) =>
-        record.studentId === studentId ? { ...record, status } : record
-      );
-      setAttendance(updatedAttendance);
+      // Create individual attendance records for each student
+      const newRecords = newAttendance.students.map(student => ({
+        id: Date.now() + Math.random(), // Temporary unique ID for mock data
+        studentId: student.id,
+        studentName: student.name,
+        class: newAttendance.class,
+        date: selectedDate,
+        status: student.status || 'present' // Default to present if status is missing
+      }));
+      
+      setAttendanceData(prevData => [...prevData, ...newRecords]);
+      setShowAddModal(false);
     } catch (error) {
-      console.error('Error marking attendance:', error);
+      console.error('Error adding attendance:', error);
     }
   };
 
-  const filteredAttendance = attendance.filter((record) => {
-    if (filter === 'all') return true;
-    if (filter === 'present') return record.status === 'present';
-    if (filter === 'absent') return record.status === 'absent';
-    return true;
+  // Filter attendance based on selected date and class
+  const filteredAttendance = attendanceData.filter(record => {
+    const dateMatch = record.date === selectedDate;
+    const classMatch = selectedClass === 'all' || record.class === selectedClass;
+    return dateMatch && classMatch;
   });
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'present':
-        return 'text-green-600';
-      case 'absent':
-        return 'text-red-600';
-      default:
-        return 'text-gray-600';
-    }
-  };
+  // If loading or user not loaded yet, show loading state
+  if (isLoading || !user) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-800 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading attendance records...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const attendanceSummary = calculateAttendanceSummary();
 
   return (
     <div className="space-y-6">
@@ -63,142 +122,157 @@ const Attendance = () => {
       <div className="bg-white rounded-lg shadow-md p-6">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Attendance</h1>
-            <p className="mt-1 text-sm text-gray-500">
-              {user.role === 'staff'
-                ? 'Manage and track student attendance'
-                : 'View your attendance records'}
-            </p>
+            <h1 className="text-2xl font-bold text-gray-900">Attendance Records</h1>
+            {user.role === 'student' ? (
+              <p className="mt-1 text-sm text-gray-500">
+                View your attendance records for {studentData?.class}
+              </p>
+            ) : (
+              <p className="mt-1 text-sm text-gray-500">
+                View and manage student attendance
+              </p>
+            )}
           </div>
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center">
-              <CalendarIcon className="h-5 w-5 text-gray-400 mr-2" />
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-              />
+          {(user.role === 'staff' || user.role === 'admin') && (
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-900 hover:bg-red-800"
+            >
+              <PlusIcon className="h-5 w-5 mr-2" />
+              Mark Attendance
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Student Attendance Summary */}
+      {user.role === 'student' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="flex items-center space-x-2">
+              <CheckCircleIcon className="h-6 w-6 text-green-600" />
+              <h3 className="text-lg font-semibold text-gray-900">Present Days</h3>
+            </div>
+            <div className="mt-2">
+              <p className="text-3xl font-bold text-green-600">{attendanceSummary.presentDays}</p>
+              <p className="text-sm text-gray-500">
+                {attendanceSummary.presentPercentage}% Attendance Rate
+              </p>
+            </div>
+          </div>
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="flex items-center space-x-2">
+              <XCircleIcon className="h-6 w-6 text-red-600" />
+              <h3 className="text-lg font-semibold text-gray-900">Absent Days</h3>
+            </div>
+            <div className="mt-2">
+              <p className="text-3xl font-bold text-red-600">{attendanceSummary.absentDays}</p>
+              <p className="text-sm text-gray-500">
+                Out of {attendanceSummary.totalDays} total days
+              </p>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Filters */}
-      <div className="bg-white rounded-lg shadow-md p-4">
-        <div className="flex space-x-4">
-          <button
-            onClick={() => setFilter('all')}
-            className={`px-4 py-2 rounded-md ${
-              filter === 'all'
-                ? 'bg-blue-100 text-blue-700'
-                : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            All
-          </button>
-          <button
-            onClick={() => setFilter('present')}
-            className={`px-4 py-2 rounded-md ${
-              filter === 'present'
-                ? 'bg-green-100 text-green-700'
-                : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            Present
-          </button>
-          <button
-            onClick={() => setFilter('absent')}
-            className={`px-4 py-2 rounded-md ${
-              filter === 'absent'
-                ? 'bg-red-100 text-red-700'
-                : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            Absent
-          </button>
+      <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Date Filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Select Date</label>
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-900 focus:ring-red-900 sm:text-sm"
+            />
+          </div>
+
+          {/* Class Filter - Only for staff/admin */}
+          {(user.role === 'staff' || user.role === 'admin') && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Select Class</label>
+              <select
+                value={selectedClass}
+                onChange={(e) => setSelectedClass(e.target.value)}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-900 focus:ring-red-900 sm:text-sm"
+              >
+                <option value="all">All Classes</option>
+                <optgroup label="Ordinary Level">
+                  {allClasses
+                    .filter(className => className.startsWith('Grade'))
+                    .map(className => (
+                      <option key={className} value={className}>{className}</option>
+                    ))}
+                </optgroup>
+                <optgroup label="Advanced Level">
+                  {allClasses
+                    .filter(className => className.startsWith('A/L'))
+                    .map(className => (
+                      <option key={className} value={className}>{className}</option>
+                    ))}
+                </optgroup>
+              </select>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Attendance List */}
+      {/* Attendance Table */}
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Student
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Class
-                </th>
+                {user.role !== 'student' && (
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Student Details
+                  </th>
+                )}
+                {user.role !== 'student' && (
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Class
+                  </th>
+                )}
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Date
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
                 </th>
-                {user.role === 'staff' && (
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                )}
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredAttendance.map((record) => (
                 <tr key={record.id}>
+                  {user.role !== 'student' && (
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900">
+                        {record.studentName}
+                      </div>
+                      <div className="text-sm text-gray-500">ID: {record.studentId}</div>
+                    </td>
+                  )}
+                  {user.role !== 'student' && (
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{record.class}</div>
+                    </td>
+                  )}
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">
-                      {record.studentName}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-500">{record.class}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-500">
+                    <div className="text-sm text-gray-900">
                       {new Date(record.date).toLocaleDateString()}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`inline-flex items-center ${getStatusColor(
-                        record.status
-                      )}`}
-                    >
-                      {record.status === 'present' ? (
-                        <CheckCircleIcon className="h-5 w-5 mr-1" />
-                      ) : (
-                        <XCircleIcon className="h-5 w-5 mr-1" />
-                      )}
-                      {record.status}
+                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                      record.status === 'present'
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-red-100 text-red-800'
+                    }`}>
+                      {record.status.charAt(0).toUpperCase() + record.status.slice(1)}
                     </span>
                   </td>
-                  {user.role === 'staff' && (
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex space-x-3">
-                        <button
-                          onClick={() =>
-                            handleMarkAttendance(record.studentId, 'present')
-                          }
-                          className="text-green-600 hover:text-green-900"
-                          title="Mark Present"
-                        >
-                          <CheckCircleIcon className="h-5 w-5" />
-                        </button>
-                        <button
-                          onClick={() =>
-                            handleMarkAttendance(record.studentId, 'absent')
-                          }
-                          className="text-red-600 hover:text-red-900"
-                          title="Mark Absent"
-                        >
-                          <XCircleIcon className="h-5 w-5" />
-                        </button>
-                      </div>
-                    </td>
-                  )}
                 </tr>
               ))}
             </tbody>
@@ -208,17 +282,25 @@ const Attendance = () => {
 
       {/* Empty State */}
       {filteredAttendance.length === 0 && (
-        <div className="text-center py-12">
-          <UserGroupIcon className="mx-auto h-12 w-12 text-gray-400" />
+        <div className="text-center py-12 bg-white rounded-lg shadow-md">
           <h3 className="mt-2 text-sm font-medium text-gray-900">
             No attendance records found
           </h3>
           <p className="mt-1 text-sm text-gray-500">
-            {filter !== 'all'
-              ? 'Try changing your filter selection'
-              : 'No attendance records for the selected date'}
+            {user.role === 'student' 
+              ? 'No attendance records found for the selected date'
+              : 'Try selecting a different date or class'}
           </p>
         </div>
+      )}
+
+      {/* Add Attendance Modal */}
+      {showAddModal && (
+        <AddAttendance
+          onClose={() => setShowAddModal(false)}
+          onAdd={handleAddAttendance}
+          selectedDate={selectedDate}
+        />
       )}
     </div>
   );

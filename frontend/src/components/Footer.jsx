@@ -6,12 +6,7 @@ import { FaInstagram } from "react-icons/fa";
 import { FaLinkedin } from "react-icons/fa";
 import { FaYoutube } from "react-icons/fa";
 import { FaLocationDot, FaPhone, FaEnvelope } from "react-icons/fa6";
-import {
-  DocumentPlusIcon,
-  UserGroupIcon,
-  ClipboardDocumentCheckIcon,
-  BellIcon,
-} from '@heroicons/react/24/outline';
+
 
 const Footer = () => {
   return (
@@ -132,7 +127,7 @@ const Footer = () => {
             <ul className="mt-4 space-y-2 text-gray-400">
               <li className="flex items-start">
                 <FaLocationDot className="mr-2 mt-1.5" />
-                <span>Mahiyangana National College,<br />Mahiyangana</span>
+                <span>Mahiyangana National School,<br />Mahiyangana, Badulla</span>
               </li>
               <li className="flex items-center">
                 <FaPhone className="mr-2" />
@@ -140,7 +135,7 @@ const Footer = () => {
               </li>
               <li className="flex items-center">
                 <FaEnvelope className="mr-2" />
-                <span>admin@mahiyanganaschool.edu</span>
+                <span>mahiyanganaschool@admin.com</span>
               </li>
             </ul>
           </div>

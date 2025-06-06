@@ -33,7 +33,9 @@ const assignments = [
     dueDate: '2024-04-15',
     status: 'active',
     submissions: 15,
-    assignedBy: 'Teacher Smith',
+    assignedBy: 'Mr. Smith',
+    class: 'Grade 10-A',
+    createdAt: '2024-04-01'
   },
   {
     id: 2,
@@ -43,7 +45,9 @@ const assignments = [
     dueDate: '2024-04-20',
     status: 'active',
     submissions: 12,
-    assignedBy: 'Teacher Smith',
+    assignedBy: 'Ms. Johnson',
+    class: 'Grade 11-B',
+    createdAt: '2024-04-02'
   },
   {
     id: 3,
@@ -53,7 +57,9 @@ const assignments = [
     dueDate: '2024-04-18',
     status: 'active',
     submissions: 8,
-    assignedBy: 'Teacher Smith',
+    assignedBy: 'Mrs. Davis',
+    class: 'Grade 9-C',
+    createdAt: '2024-04-03'
   },
   {
     id: 4,
@@ -63,48 +69,301 @@ const assignments = [
     dueDate: '2024-04-25',
     status: 'active',
     submissions: 5,
-    assignedBy: 'Teacher Smith',
+    assignedBy: 'Mr. Wilson',
+    class: 'Grade 10-B',
+    createdAt: '2024-04-04'
   },
 ];
 
 // Mock Attendance Records
 const attendance = [
+  // Grade 6-A
   {
     id: 1,
-    studentId: '3',
-    studentName: 'John Student',
+    studentId: '1',
+    studentName: 'Kamal Perera',
     date: '2024-04-01',
     status: 'present',
-    subject: 'Mathematics',
-    class: 'Grade 10A',
+    class: 'Grade 6-A',
+    month: 'April'
   },
   {
     id: 2,
-    studentId: '3',
-    studentName: 'John Student',
-    date: '2024-04-02',
-    status: 'present',
-    subject: 'Science',
-    class: 'Grade 10A',
+    studentId: '2',
+    studentName: 'Saman Silva',
+    date: '2024-04-01',
+    status: 'absent',
+    class: 'Grade 6-A',
+    month: 'April'
   },
   {
     id: 3,
     studentId: '3',
-    studentName: 'John Student',
-    date: '2024-04-03',
-    status: 'absent',
-    subject: 'English',
-    class: 'Grade 10A',
+    studentName: 'Nimal Fernando',
+    date: '2024-04-01',
+    status: 'present',
+    class: 'Grade 6-A',
+    month: 'April'
   },
+  // Grade 7-B
   {
     id: 4,
-    studentId: '3',
-    studentName: 'John Student',
-    date: '2024-04-04',
+    studentId: '4',
+    studentName: 'Malini Dias',
+    date: '2024-04-01',
     status: 'present',
-    subject: 'History',
-    class: 'Grade 10A',
+    class: 'Grade 7-B',
+    month: 'April'
   },
+  {
+    id: 5,
+    studentId: '5',
+    studentName: 'Kumara Bandara',
+    date: '2024-04-01',
+    status: 'present',
+    class: 'Grade 7-B',
+    month: 'April'
+  },
+  {
+    id: 6,
+    studentId: '6',
+    studentName: 'Chamari Atapattu',
+    date: '2024-04-01',
+    status: 'absent',
+    class: 'Grade 7-B',
+    month: 'April'
+  },
+  // Grade 8-C
+  {
+    id: 7,
+    studentId: '7',
+    studentName: 'Dinesh Chandimal',
+    date: '2024-04-01',
+    status: 'present',
+    class: 'Grade 8-C',
+    month: 'April'
+  },
+  {
+    id: 8,
+    studentId: '8',
+    studentName: 'Lasith Malinga',
+    date: '2024-04-01',
+    status: 'present',
+    class: 'Grade 8-C',
+    month: 'April'
+  },
+  {
+    id: 9,
+    studentId: '9',
+    studentName: 'Mahela Jayawardene',
+    date: '2024-04-01',
+    status: 'present',
+    class: 'Grade 8-C',
+    month: 'April'
+  },
+  // Grade 9-A
+  {
+    id: 10,
+    studentId: '10',
+    studentName: 'Sachini Fernando',
+    date: '2024-04-01',
+    status: 'present',
+    class: 'Grade 9-A',
+    month: 'April'
+  },
+  {
+    id: 11,
+    studentId: '11',
+    studentName: 'Kavindi Silva',
+    date: '2024-04-01',
+    status: 'absent',
+    class: 'Grade 9-A',
+    month: 'April'
+  },
+  {
+    id: 12,
+    studentId: '12',
+    studentName: 'Thisara Perera',
+    date: '2024-04-01',
+    status: 'present',
+    class: 'Grade 9-A',
+    month: 'April'
+  },
+  // Grade 10-B
+  {
+    id: 13,
+    studentId: '13',
+    studentName: 'Dimuth Karunaratne',
+    date: '2024-04-01',
+    status: 'present',
+    class: 'Grade 10-B',
+    month: 'April'
+  },
+  {
+    id: 14,
+    studentId: '14',
+    studentName: 'Kusal Mendis',
+    date: '2024-04-01',
+    status: 'present',
+    class: 'Grade 10-B',
+    month: 'April'
+  },
+  {
+    id: 15,
+    studentId: '15',
+    studentName: 'Angelo Mathews',
+    date: '2024-04-01',
+    status: 'absent',
+    class: 'Grade 10-B',
+    month: 'April'
+  },
+  // Grade 11-C
+  {
+    id: 16,
+    studentId: '16',
+    studentName: 'Dhananjaya de Silva',
+    date: '2024-04-01',
+    status: 'present',
+    class: 'Grade 11-C',
+    month: 'April'
+  },
+  {
+    id: 17,
+    studentId: '17',
+    studentName: 'Wanindu Hasaranga',
+    date: '2024-04-01',
+    status: 'present',
+    class: 'Grade 11-C',
+    month: 'April'
+  },
+  {
+    id: 18,
+    studentId: '18',
+    studentName: 'Charith Asalanka',
+    date: '2024-04-01',
+    status: 'present',
+    class: 'Grade 11-C',
+    month: 'April'
+  },
+  // A/L Physical Science Students
+  {
+    id: 19,
+    studentId: '19',
+    studentName: 'Pathum Nissanka',
+    date: '2024-04-01',
+    status: 'present',
+    class: 'A/L Physical Science',
+    month: 'April'
+  },
+  {
+    id: 20,
+    studentId: '20',
+    studentName: 'Dasun Shanaka',
+    date: '2024-04-01',
+    status: 'present',
+    class: 'A/L Physical Science',
+    month: 'April'
+  },
+  
+  // A/L Biological Science Students
+  {
+    id: 21,
+    studentId: '21',
+    studentName: 'Kusal Perera',
+    date: '2024-04-01',
+    status: 'absent',
+    class: 'A/L Biological Science',
+    month: 'April'
+  },
+  {
+    id: 22,
+    studentId: '22',
+    studentName: 'Chamika Karunaratne',
+    date: '2024-04-01',
+    status: 'present',
+    class: 'A/L Biological Science',
+    month: 'April'
+  },
+  
+  // A/L Bio Technology Students
+  {
+    id: 23,
+    studentId: '23',
+    studentName: 'Dushmantha Chameera',
+    date: '2024-04-01',
+    status: 'present',
+    class: 'A/L Bio Technology',
+    month: 'April'
+  },
+  {
+    id: 24,
+    studentId: '24',
+    studentName: 'Maheesh Theekshana',
+    date: '2024-04-01',
+    status: 'absent',
+    class: 'A/L Bio Technology',
+    month: 'April'
+  },
+  
+  // A/L Engineering Technology Students
+  {
+    id: 25,
+    studentId: '25',
+    studentName: 'Ashen Bandara',
+    date: '2024-04-01',
+    status: 'present',
+    class: 'A/L Engineering Technology',
+    month: 'April'
+  },
+  {
+    id: 26,
+    studentId: '26',
+    studentName: 'Praveen Jayawickrama',
+    date: '2024-04-01',
+    status: 'present',
+    class: 'A/L Engineering Technology',
+    month: 'April'
+  },
+  
+  // A/L Commerce Students
+  {
+    id: 27,
+    studentId: '27',
+    studentName: 'Lahiru Kumara',
+    date: '2024-04-01',
+    status: 'present',
+    class: 'A/L Commerce',
+    month: 'April'
+  },
+  {
+    id: 28,
+    studentId: '28',
+    studentName: 'Dilshan Madushanka',
+    date: '2024-04-01',
+    status: 'absent',
+    class: 'A/L Commerce',
+    month: 'April'
+  },
+  
+  // A/L Arts Students
+  {
+    id: 29,
+    studentId: '29',
+    studentName: 'Kasun Rajitha',
+    date: '2024-04-01',
+    status: 'present',
+    class: 'A/L Arts',
+    month: 'April'
+  },
+  {
+    id: 30,
+    studentId: '30',
+    studentName: 'Jeffrey Vandersay',
+    date: '2024-04-01',
+    status: 'present',
+    class: 'A/L Arts',
+    month: 'April'
+  }
 ];
 
 // Mock Marks/Grades
@@ -120,6 +379,7 @@ const marks = [
     totalMarks: 100,
     grade: 'A',
     date: '2024-03-15',
+    class: 'Grade 10-A'
   },
   {
     id: 2,
@@ -132,6 +392,7 @@ const marks = [
     totalMarks: 100,
     grade: 'B+',
     date: '2024-03-20',
+    class: 'Grade 10-A'
   },
   {
     id: 3,
@@ -144,6 +405,7 @@ const marks = [
     totalMarks: 100,
     grade: 'A+',
     date: '2024-03-25',
+    class: 'Grade 10-A'
   },
   {
     id: 4,
@@ -156,6 +418,7 @@ const marks = [
     totalMarks: 100,
     grade: 'A',
     date: '2024-03-30',
+    class: 'Grade 10-A'
   },
 ];
 
@@ -165,42 +428,34 @@ const notifications = [
     id: 1,
     title: 'New Assignment Posted',
     message: 'Mathematics Assignment 1 has been posted. Due date: April 15, 2024',
-    type: 'info',
+    category: 'assignment',
     date: '2024-04-01',
     isRead: false,
   },
   {
     id: 2,
-    title: 'Assignment Graded',
+    title: 'Marks Updated',
     message: 'Your Science Lab Report has been graded. Check your marks.',
-    type: 'success',
+    category: 'marks',
     date: '2024-04-02',
     isRead: false,
   },
   {
     id: 3,
-    title: 'Attendance Alert',
-    message: 'You were marked absent for English class on April 3, 2024',
-    type: 'warning',
+    title: 'New Assignment Posted',
+    message: 'English Essay Assignment has been posted. Due date: April 25, 2024',
+    category: 'assignment',
     date: '2024-04-03',
     isRead: true,
   },
   {
     id: 4,
-    title: 'Upcoming Test',
-    message: 'Mathematics mid-term test scheduled for April 20, 2024',
-    type: 'info',
+    title: 'Term Test Marks Updated',
+    message: 'Mathematics Term 1 Test marks have been updated.',
+    category: 'marks',
     date: '2024-04-04',
     isRead: false,
-  },
-  {
-    id: 5,
-    title: 'System Maintenance',
-    message: 'System will be under maintenance on Sunday, April 7, 2024',
-    type: 'error',
-    date: '2024-04-05',
-    isRead: false,
-  },
+  }
 ];
 
 // Mock API Service
@@ -238,8 +493,8 @@ export const mockApi = {
 
   // Marks Methods
   getMarks: async (role, userId) => {
-    if (role === 'staff') {
-      return marks; // Return all marks
+    if (role === 'staff' || role === 'admin') {
+      return marks; // Return all marks for staff and admin
     }
     // For students, filter their own marks
     return marks.filter((mark) => mark.studentId === userId);

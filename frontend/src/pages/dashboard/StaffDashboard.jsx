@@ -1,76 +1,89 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { mockApi } from '../../services/mockData';
 import {
   DocumentPlusIcon,
   UserGroupIcon,
-  ClipboardDocumentCheckIcon,
-  BellIcon,
+  AcademicCapIcon,
 } from '@heroicons/react/24/outline';
 import ImageSlider from '../../components/ImageSlider';
+import AddAssignment from '../../components/AddAssignment';
+import AddMarks from '../../components/AddMarks';
+import AddAttendance from '../../components/AddAttendance';
 
 const StaffDashboard = () => {
   const { user } = useAuth();
-  const [assignments, setAssignments] = useState([]);
-  const [students, setStudents] = useState([]);
-  const [stats, setStats] = useState({
-    totalAssignments: 0,
-    pendingGrading: 0,
-    totalStudents: 0,
-    attendanceToday: 0,
-  });
+  const [showAddAssignmentModal, setShowAddAssignmentModal] = useState(false);
+  const [showAddMarksModal, setShowAddMarksModal] = useState(false);
+  const [showAddAttendanceModal, setShowAddAttendanceModal] = useState(false);
+  const [recentAssignments, setRecentAssignments] = useState([]);
+  const [recentMarks, setRecentMarks] = useState([]);
+  const [recentAttendance, setRecentAttendance] = useState([]);
 
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        // Mock data - In a real app, these would be API calls
-        const assignmentsData = [
-          {
-            id: 1,
-            title: 'Mathematics Assignment 1',
-            subject: 'Mathematics',
-            dueDate: '2024-04-15',
-            status: 'active',
-            submissions: 15,
-          },
-          {
-            id: 2,
-            title: 'Science Project',
-            subject: 'Science',
-            dueDate: '2024-04-20',
-            status: 'active',
-            submissions: 12,
-          },
-        ];
-
-        const studentsData = [
-          { id: 1, name: 'John Doe', attendance: 'present' },
-          { id: 2, name: 'Jane Smith', attendance: 'absent' },
-          { id: 3, name: 'Mike Johnson', attendance: 'present' },
-        ];
-
-        setAssignments(assignmentsData);
-        setStudents(studentsData);
-        setStats({
-          totalAssignments: assignmentsData.length,
-          pendingGrading: assignmentsData.reduce(
-            (acc, curr) => acc + curr.submissions,
-            0
-          ),
-          totalStudents: studentsData.length,
-          attendanceToday: studentsData.filter(
-            (s) => s.attendance === 'present'
-          ).length,
-        });
-      } catch (error) {
-        console.error('Error fetching dashboard data:', error);
-      }
-    };
-
-    if (user) {
-      fetchDashboardData();
+  const handleAddAssignment = async (newAssignment) => {
+    try {
+      // In a real app, this would make an API call to add the assignment
+      const notification = {
+        id: Date.now(),
+        title: 'New Assignment Posted',
+        message: `${newAssignment.title} has been posted. Due date: ${new Date(newAssignment.dueDate).toLocaleDateString()}`,
+        category: 'assignment',
+        date: new Date().toISOString(),
+        isRead: false,
+      };
+      
+      // Add to recent assignments
+      setRecentAssignments(prev => [
+        { ...newAssignment, id: Date.now() },
+        ...prev.slice(0, 4)
+      ]);
+      
+      console.log('New Assignment Notification:', notification);
+      setShowAddAssignmentModal(false);
+    } catch (error) {
+      console.error('Error adding assignment:', error);
     }
-  }, [user]);
+  };
+
+  const handleAddMarks = async (newMark) => {
+    try {
+      // In a real app, this would make an API call to add the marks
+      const notification = {
+        id: Date.now(),
+        title: 'Marks Updated',
+        message: `${newMark.subject} marks have been updated for ${newMark.studentName}`,
+        category: 'marks',
+        date: new Date().toISOString(),
+        isRead: false,
+      };
+      
+      // Add to recent marks
+      setRecentMarks(prev => [
+        { ...newMark, id: Date.now() },
+        ...prev.slice(0, 4)
+      ]);
+      
+      console.log('New Marks Notification:', notification);
+      setShowAddMarksModal(false);
+    } catch (error) {
+      console.error('Error adding marks:', error);
+    }
+  };
+
+  const handleAddAttendance = async (attendanceData) => {
+    try {
+      // Add to recent attendance
+      setRecentAttendance(prev => [
+        { ...attendanceData, id: Date.now() },
+        ...prev.slice(0, 4)
+      ]);
+      
+      console.log('Attendance added:', attendanceData);
+      setShowAddAttendanceModal(false);
+    } catch (error) {
+      console.error('Error adding attendance:', error);
+    }
+  };
 
   // If user is not loaded yet, show loading state
   if (!user) {
@@ -85,7 +98,7 @@ const StaffDashboard = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="container mx-auto px-4 py-8 space-y-6">
       {/* Welcome Section with Image Slider */}
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
         <ImageSlider />
@@ -99,9 +112,12 @@ const StaffDashboard = () => {
         </div>
       </div>
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <button className="p-6 bg-white rounded-lg shadow-md hover:bg-gray-50 transition-colors duration-200">
+      {/* Action Buttons */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <button
+          onClick={() => setShowAddAssignmentModal(true)}
+          className="p-6 bg-white rounded-lg shadow-md hover:bg-gray-50 transition-colors duration-200 flex flex-col items-center"
+        >
           <DocumentPlusIcon className="h-8 w-8 text-blue-600 mb-3" />
           <h3 className="text-lg font-semibold text-gray-900">
             Create Assignment
@@ -109,164 +125,109 @@ const StaffDashboard = () => {
           <p className="text-sm text-gray-500">Upload new assignments</p>
         </button>
 
-        <button className="p-6 bg-white rounded-lg shadow-md hover:bg-gray-50 transition-colors duration-200">
+        <button
+          onClick={() => setShowAddAttendanceModal(true)}
+          className="p-6 bg-white rounded-lg shadow-md hover:bg-gray-50 transition-colors duration-200 flex flex-col items-center"
+        >
           <UserGroupIcon className="h-8 w-8 text-green-600 mb-3" />
           <h3 className="text-lg font-semibold text-gray-900">Mark Attendance</h3>
           <p className="text-sm text-gray-500">Record student attendance</p>
         </button>
 
-        <button className="p-6 bg-white rounded-lg shadow-md hover:bg-gray-50 transition-colors duration-200">
-          <ClipboardDocumentCheckIcon className="h-8 w-8 text-purple-600 mb-3" />
+        <button
+          onClick={() => setShowAddMarksModal(true)}
+          className="p-6 bg-white rounded-lg shadow-md hover:bg-gray-50 transition-colors duration-200 flex flex-col items-center"
+        >
+          <AcademicCapIcon className="h-8 w-8 text-purple-600 mb-3" />
           <h3 className="text-lg font-semibold text-gray-900">Enter Marks</h3>
           <p className="text-sm text-gray-500">Grade assignments and tests</p>
         </button>
-
-        <button className="p-6 bg-white rounded-lg shadow-md hover:bg-gray-50 transition-colors duration-200">
-          <BellIcon className="h-8 w-8 text-yellow-600 mb-3" />
-          <h3 className="text-lg font-semibold text-gray-900">
-            Send Notification
-          </h3>
-          <p className="text-sm text-gray-500">Communicate with students</p>
-        </button>
       </div>
 
-      {/* Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      {/* Recent Activities Display */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Recent Assignments */}
         <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-semibold text-gray-900">
-            Total Assignments
-          </h3>
-          <p className="text-3xl font-bold text-blue-600">
-            {stats.totalAssignments}
-          </p>
-        </div>
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-semibold text-gray-900">Pending Grading</h3>
-          <p className="text-3xl font-bold text-yellow-600">
-            {stats.pendingGrading}
-          </p>
-        </div>
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-semibold text-gray-900">Total Students</h3>
-          <p className="text-3xl font-bold text-green-600">
-            {stats.totalStudents}
-          </p>
-        </div>
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-semibold text-gray-900">
-            Today's Attendance
-          </h3>
-          <p className="text-3xl font-bold text-purple-600">
-            {stats.attendanceToday}/{stats.totalStudents}
-          </p>
-        </div>
-      </div>
-
-      {/* Recent Assignments */}
-      <div className="bg-white rounded-lg shadow-md">
-        <div className="p-6 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">
-            Recent Assignments
-          </h2>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Title
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Subject
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Due Date
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Submissions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {assignments.map((assignment) => (
-                <tr key={assignment.id}>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">
-                      {assignment.title}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-500">
-                      {assignment.subject}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-500">
-                      {new Date(assignment.dueDate).toLocaleDateString()}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                      {assignment.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {assignment.submissions} submissions
-                  </td>
-                </tr>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Assignments</h3>
+          {recentAssignments.length > 0 ? (
+            <div className="space-y-4">
+              {recentAssignments.map(assignment => (
+                <div key={assignment.id} className="border-b pb-4">
+                  <h4 className="font-medium text-gray-900">{assignment.title}</h4>
+                  <p className="text-sm text-gray-500">Class: {assignment.class}</p>
+                  <p className="text-sm text-gray-500">Due: {new Date(assignment.dueDate).toLocaleDateString()}</p>
+                </div>
               ))}
-            </tbody>
-          </table>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500">No recent assignments</p>
+          )}
+        </div>
+
+        {/* Recent Attendance */}
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Attendance</h3>
+          {recentAttendance.length > 0 ? (
+            <div className="space-y-4">
+              {recentAttendance.map(record => (
+                <div key={record.id} className="border-b pb-4">
+                  <h4 className="font-medium text-gray-900">{record.class}</h4>
+                  <p className="text-sm text-gray-500">Date: {new Date(record.date).toLocaleDateString()}</p>
+                  <p className="text-sm text-gray-500">
+                    Present: {record.students.filter(s => s.status === 'present').length} | 
+                    Absent: {record.students.filter(s => s.status === 'absent').length}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500">No recent attendance records</p>
+          )}
+        </div>
+
+        {/* Recent Marks */}
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Marks</h3>
+          {recentMarks.length > 0 ? (
+            <div className="space-y-4">
+              {recentMarks.map(mark => (
+                <div key={mark.id} className="border-b pb-4">
+                  <h4 className="font-medium text-gray-900">{mark.studentName}</h4>
+                  <p className="text-sm text-gray-500">Subject: {mark.subject}</p>
+                  <p className="text-sm text-gray-500">Marks: {mark.value}/{mark.totalMarks}</p>
+                  <p className="text-sm text-gray-500">Grade: {mark.grade}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500">No recent marks</p>
+          )}
         </div>
       </div>
 
-      {/* Today's Attendance */}
-      <div className="bg-white rounded-lg shadow-md">
-        <div className="p-6 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">
-            Today's Attendance
-          </h2>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Student Name
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {students.map((student) => (
-                <tr key={student.id}>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">
-                      {student.name}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        student.attendance === 'present'
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
-                      }`}
-                    >
-                      {student.attendance}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {/* Add Assignment Modal */}
+      {showAddAssignmentModal && (
+        <AddAssignment
+          onClose={() => setShowAddAssignmentModal(false)}
+          onAdd={handleAddAssignment}
+        />
+      )}
+
+      {/* Add Marks Modal */}
+      {showAddMarksModal && (
+        <AddMarks
+          onClose={() => setShowAddMarksModal(false)}
+          onAdd={handleAddMarks}
+        />
+      )}
+
+      {/* Add Attendance Modal */}
+      {showAddAttendanceModal && (
+        <AddAttendance
+          onClose={() => setShowAddAttendanceModal(false)}
+          onAdd={handleAddAttendance}
+        />
+      )}
     </div>
   );
 };
