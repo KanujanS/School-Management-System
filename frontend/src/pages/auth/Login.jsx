@@ -25,7 +25,6 @@ const Login = () => {
         role: formData.role,
         name: 'John Doe',
       });
-      toast.success('Login successful!');
     } else {
       toast.error('Please fill in all fields');
     }
