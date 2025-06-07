@@ -1,63 +1,61 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { mockApi } from '../../services/mockData';
+import { assignmentsAPI } from '../../services/api';
 import {
   DocumentPlusIcon,
   TrashIcon,
   FunnelIcon,
 } from '@heroicons/react/24/outline';
 import AddAssignment from '../../components/AddAssignment';
+import toast from 'react-hot-toast';
 
 const Assignments = () => {
   const { user } = useAuth();
   const [assignments, setAssignments] = useState([]);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [studentData, setStudentData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setIsLoading(true);
-        
-        // If user is a student, fetch their class information first
-        let studentClass = null;
-        if (user.role === 'student') {
-          const studentDetails = await mockApi.getStudentDetails(user.id);
-          setStudentData(studentDetails);
-          studentClass = studentDetails?.class;
-        }
+    fetchAssignments();
+  }, [user]);
 
-        // Fetch assignments
-        const data = await mockApi.getAssignments(user.role, user.id);
-        
-        // Filter assignments based on user role and class
-        const filteredAssignments = user.role === 'student' 
-          ? data.filter(assignment => assignment.class === studentClass)
-          : data;
-
-        setAssignments(filteredAssignments);
-      } catch (error) {
-        console.error('Error fetching data:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [user.role, user.id]);
+  const fetchAssignments = async () => {
+    try {
+      setIsLoading(true);
+      const params = user.role === 'student' ? { class: user.class } : {};
+      const data = await assignmentsAPI.getAll(params);
+      setAssignments(data);
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleAddAssignment = () => {
     setShowAddModal(true);
   };
 
-  const handleAddNewAssignment = (newAssignment) => {
-    setAssignments(prevAssignments => [newAssignment, ...prevAssignments]);
+  const handleAddNewAssignment = async (assignmentData) => {
+    try {
+      const newAssignment = await assignmentsAPI.create(assignmentData);
+      setAssignments(prevAssignments => [newAssignment, ...prevAssignments]);
+      setShowAddModal(false);
+      toast.success('Assignment created successfully');
+    } catch (error) {
+      toast.error(error.message);
+    }
   };
 
-  const handleDelete = (assignmentId) => {
+  const handleDelete = async (assignmentId) => {
     if (window.confirm('Are you sure you want to delete this assignment?')) {
-      setAssignments(assignments.filter((a) => a.id !== assignmentId));
+      try {
+        await assignmentsAPI.delete(assignmentId);
+        setAssignments(assignments.filter((a) => a._id !== assignmentId));
+        toast.success('Assignment deleted successfully');
+      } catch (error) {
+        toast.error(error.message);
+      }
     }
   };
 
@@ -83,7 +81,7 @@ const Assignments = () => {
             <p className="mt-1 text-sm text-gray-500">
               {user.role === 'staff' || user.role === 'admin'
                 ? 'Manage class assignments'
-                : `View assignments for ${studentData?.class || 'your class'}`}
+                : `View assignments for ${user.class}`}
             </p>
           </div>
           {(user.role === 'staff' || user.role === 'admin') && (
@@ -125,7 +123,7 @@ const Assignments = () => {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {assignments.map((assignment) => (
-                <tr key={assignment.id}>
+                <tr key={assignment._id}>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900">
                       {assignment.title}
@@ -141,7 +139,7 @@ const Assignments = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900">
-                      {assignment.assignedBy}
+                      {assignment.createdBy?.name}
                     </div>
                     <div className="text-sm text-gray-500">
                       {new Date(assignment.createdAt).toLocaleDateString()}
@@ -155,7 +153,7 @@ const Assignments = () => {
                   {(user.role === 'staff' || user.role === 'admin') && (
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <button
-                        onClick={() => handleDelete(assignment.id)}
+                        onClick={() => handleDelete(assignment._id)}
                         className="text-red-900 hover:text-red-800"
                         title="Delete Assignment"
                       >
@@ -180,7 +178,7 @@ const Assignments = () => {
           <p className="mt-1 text-sm text-gray-500">
             {user.role === 'staff' || user.role === 'admin'
               ? 'Get started by creating a new assignment'
-              : `No assignments have been assigned for ${studentData?.class || 'your class'}`}
+              : `No assignments have been assigned for ${user.class}`}
           </p>
         </div>
       )}
