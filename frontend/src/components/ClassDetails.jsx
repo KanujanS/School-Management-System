@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   UserPlusIcon, 
@@ -6,25 +6,15 @@ import {
   XMarkIcon,
   ArrowLeftIcon
 } from '@heroicons/react/24/outline';
+import { studentsAPI } from '../../services/api';
+import toast from 'react-hot-toast';
 
 const ClassDetails = () => {
   const { gradeId, division } = useParams();
   const navigate = useNavigate();
   const [showAddStudentModal, setShowAddStudentModal] = useState(false);
-  const [students, setStudents] = useState([
-    {
-      id: 1,
-      name: 'John Perera',
-      admissionNumber: '2024001',
-      gender: 'Male',
-      dateOfBirth: '2010-05-15',
-      address: '123 School Lane, Mahiyangana',
-      parentName: 'David Perera',
-      contactNumber: '+94 77 123 4567',
-      email: 'john.perera@student.com'
-    },
-    // Add more mock data as needed
-  ]);
+  const [students, setStudents] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const [newStudent, setNewStudent] = useState({
     name: '',
@@ -37,6 +27,23 @@ const ClassDetails = () => {
     email: ''
   });
 
+  useEffect(() => {
+    const fetchStudents = async () => {
+      try {
+        setIsLoading(true);
+        const data = await studentsAPI.getByClass(`Grade ${gradeId}-${division}`);
+        setStudents(data);
+      } catch (error) {
+        console.error('Error fetching students:', error);
+        toast.error('Failed to load students');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchStudents();
+  }, [gradeId, division]);
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setNewStudent(prev => ({
@@ -45,19 +52,32 @@ const ClassDetails = () => {
     }));
   };
 
-  const handleAddStudent = (e) => {
+  const handleAddStudent = async (e) => {
     e.preventDefault();
-    const newStudentData = {
-      id: students.length + 1,
-      ...newStudent
-    };
-    setStudents(prev => [...prev, newStudentData]);
+    try {
+      const response = await studentsAPI.create({
+        ...newStudent,
+        class: `Grade ${gradeId}-${division}`
+      });
+      setStudents(prev => [...prev, response.data]);
     handleCloseModal();
+      toast.success('Student added successfully');
+    } catch (error) {
+      console.error('Error adding student:', error);
+      toast.error('Failed to add student');
+    }
   };
 
-  const handleDeleteStudent = (studentId) => {
+  const handleDeleteStudent = async (studentId) => {
     if (window.confirm('Are you sure you want to remove this student?')) {
-      setStudents(students.filter(student => student.id !== studentId));
+      try {
+        await studentsAPI.delete(studentId);
+        setStudents(students.filter(student => student._id !== studentId));
+        toast.success('Student removed successfully');
+      } catch (error) {
+        console.error('Error deleting student:', error);
+        toast.error('Failed to remove student');
+      }
     }
   };
 
@@ -74,6 +94,17 @@ const ClassDetails = () => {
       email: ''
     });
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-800 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading class details...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-8">
@@ -130,7 +161,7 @@ const ClassDetails = () => {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {students.map((student) => (
-                <tr key={student.id}>
+                <tr key={student._id}>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <div className="ml-4">
@@ -154,7 +185,7 @@ const ClassDetails = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <button
-                      onClick={() => handleDeleteStudent(student.id)}
+                      onClick={() => handleDeleteStudent(student._id)}
                       className="text-red-900 hover:text-red-800"
                     >
                       <TrashIcon className="h-5 w-5" />

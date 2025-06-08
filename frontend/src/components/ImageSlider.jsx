@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import Photo1 from '../assets/Photo1.png';
+import photo1 from '../assets/photo1.png';
 import photo2 from '../assets/photo2.png';
 import photo3 from '../assets/photo3.png';
 import photo4 from '../assets/photo4.png';
@@ -9,7 +9,7 @@ const ImageSlider = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
 
   const slides = [
-    { url: Photo1, title: 'School Building' },
+    { url: photo1, title: 'School Building' },
     { url: photo2, title: 'School Activities' },
     { url: photo3, title: 'School Events' },
     { url: photo4, title: 'School Sports' },

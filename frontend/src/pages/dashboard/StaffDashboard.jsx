@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { mockApi } from '../../services/mockData';
+import { assignmentsAPI, marksAPI, attendanceAPI } from '../../services/api';
 import {
   DocumentPlusIcon,
   UserGroupIcon,
@@ -10,6 +10,7 @@ import ImageSlider from '../../components/ImageSlider';
 import AddAssignment from '../../components/AddAssignment';
 import AddMarks from '../../components/AddMarks';
 import AddAttendance from '../../components/AddAttendance';
+import toast from 'react-hot-toast';
 
 const StaffDashboard = () => {
   const { user } = useAuth();
@@ -19,74 +20,72 @@ const StaffDashboard = () => {
   const [recentAssignments, setRecentAssignments] = useState([]);
   const [recentMarks, setRecentMarks] = useState([]);
   const [recentAttendance, setRecentAttendance] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        setIsLoading(true);
+        const [assignments, marks, attendance] = await Promise.all([
+          assignmentsAPI.getAll({ limit: 5 }),
+          marksAPI.getAll({ limit: 5 }),
+          attendanceAPI.getAll({ limit: 5 })
+        ]);
+
+        setRecentAssignments(assignments);
+        setRecentMarks(marks);
+        setRecentAttendance(attendance);
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+        toast.error('Failed to load dashboard data');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (user) {
+      fetchDashboardData();
+    }
+  }, [user]);
 
   const handleAddAssignment = async (newAssignment) => {
     try {
-      // In a real app, this would make an API call to add the assignment
-      const notification = {
-        id: Date.now(),
-        title: 'New Assignment Posted',
-        message: `${newAssignment.title} has been posted. Due date: ${new Date(newAssignment.dueDate).toLocaleDateString()}`,
-        category: 'assignment',
-        date: new Date().toISOString(),
-        isRead: false,
-      };
-      
-      // Add to recent assignments
-      setRecentAssignments(prev => [
-        { ...newAssignment, id: Date.now() },
-        ...prev.slice(0, 4)
-      ]);
-      
-      console.log('New Assignment Notification:', notification);
+      const response = await assignmentsAPI.create(newAssignment);
+      setRecentAssignments(prev => [response, ...prev.slice(0, 4)]);
       setShowAddAssignmentModal(false);
+      toast.success('Assignment added successfully');
     } catch (error) {
       console.error('Error adding assignment:', error);
+      toast.error('Failed to add assignment');
     }
   };
 
   const handleAddMarks = async (newMark) => {
     try {
-      // In a real app, this would make an API call to add the marks
-      const notification = {
-        id: Date.now(),
-        title: 'Marks Updated',
-        message: `${newMark.subject} marks have been updated for ${newMark.studentName}`,
-        category: 'marks',
-        date: new Date().toISOString(),
-        isRead: false,
-      };
-      
-      // Add to recent marks
-      setRecentMarks(prev => [
-        { ...newMark, id: Date.now() },
-        ...prev.slice(0, 4)
-      ]);
-      
-      console.log('New Marks Notification:', notification);
+      const response = await marksAPI.create(newMark);
+      setRecentMarks(prev => [response, ...prev.slice(0, 4)]);
       setShowAddMarksModal(false);
+      toast.success('Marks added successfully');
     } catch (error) {
       console.error('Error adding marks:', error);
+      toast.error('Failed to add marks');
     }
   };
 
   const handleAddAttendance = async (attendanceData) => {
     try {
-      // Add to recent attendance
-      setRecentAttendance(prev => [
-        { ...attendanceData, id: Date.now() },
-        ...prev.slice(0, 4)
-      ]);
-      
-      console.log('Attendance added:', attendanceData);
+      const response = await attendanceAPI.create(attendanceData);
+      setRecentAttendance(prev => [response, ...prev.slice(0, 4)]);
       setShowAddAttendanceModal(false);
+      toast.success('Attendance recorded successfully');
     } catch (error) {
       console.error('Error adding attendance:', error);
+      toast.error('Failed to record attendance');
     }
   };
 
-  // If user is not loaded yet, show loading state
-  if (!user) {
+  // If user is not loaded yet or data is loading, show loading state
+  if (isLoading || !user) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -98,114 +97,93 @@ const StaffDashboard = () => {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 space-y-6">
-      {/* Welcome Section with Image Slider */}
+    <div className="p-6 space-y-8">
+      {/* Header with Image Slider */}
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
         <ImageSlider />
         <div className="p-6">
-          <h1 className="text-3xl font-bold text-gray-900">
-            Welcome, {user.name}
-          </h1>
-          <p className="mt-2 text-gray-600">
-            Manage your classes, assignments, and student progress
-          </p>
+          <h1 className="text-3xl font-bold text-gray-900">Welcome, {user.name}</h1>
+          <p className="mt-2 text-gray-600">Manage your teaching activities</p>
         </div>
       </div>
 
-      {/* Action Buttons */}
+      {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <button
           onClick={() => setShowAddAssignmentModal(true)}
-          className="p-6 bg-white rounded-lg shadow-md hover:bg-gray-50 transition-colors duration-200 flex flex-col items-center"
+          className="p-6 bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow"
         >
-          <DocumentPlusIcon className="h-8 w-8 text-blue-600 mb-3" />
-          <h3 className="text-lg font-semibold text-gray-900">
-            Create Assignment
-          </h3>
-          <p className="text-sm text-gray-500">Upload new assignments</p>
-        </button>
-
-        <button
-          onClick={() => setShowAddAttendanceModal(true)}
-          className="p-6 bg-white rounded-lg shadow-md hover:bg-gray-50 transition-colors duration-200 flex flex-col items-center"
-        >
-          <UserGroupIcon className="h-8 w-8 text-green-600 mb-3" />
-          <h3 className="text-lg font-semibold text-gray-900">Mark Attendance</h3>
-          <p className="text-sm text-gray-500">Record student attendance</p>
+          <DocumentPlusIcon className="h-8 w-8 text-red-900 mb-4" />
+          <h3 className="text-lg font-semibold text-gray-900">Add Assignment</h3>
+          <p className="mt-2 text-sm text-gray-600">Create and assign new work</p>
         </button>
 
         <button
           onClick={() => setShowAddMarksModal(true)}
-          className="p-6 bg-white rounded-lg shadow-md hover:bg-gray-50 transition-colors duration-200 flex flex-col items-center"
+          className="p-6 bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow"
         >
-          <AcademicCapIcon className="h-8 w-8 text-purple-600 mb-3" />
-          <h3 className="text-lg font-semibold text-gray-900">Enter Marks</h3>
-          <p className="text-sm text-gray-500">Grade assignments and tests</p>
+          <AcademicCapIcon className="h-8 w-8 text-red-900 mb-4" />
+          <h3 className="text-lg font-semibold text-gray-900">Add Marks</h3>
+          <p className="mt-2 text-sm text-gray-600">Record student marks</p>
+        </button>
+
+        <button
+          onClick={() => setShowAddAttendanceModal(true)}
+          className="p-6 bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow"
+        >
+          <UserGroupIcon className="h-8 w-8 text-red-900 mb-4" />
+          <h3 className="text-lg font-semibold text-gray-900">Mark Attendance</h3>
+          <p className="mt-2 text-sm text-gray-600">Record student attendance</p>
         </button>
       </div>
 
-      {/* Recent Activities Display */}
+      {/* Recent Activity */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Recent Assignments */}
         <div className="bg-white rounded-lg shadow-md p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Assignments</h3>
-          {recentAssignments.length > 0 ? (
-            <div className="space-y-4">
-              {recentAssignments.map(assignment => (
-                <div key={assignment.id} className="border-b pb-4">
-                  <h4 className="font-medium text-gray-900">{assignment.title}</h4>
-                  <p className="text-sm text-gray-500">Class: {assignment.class}</p>
-                  <p className="text-sm text-gray-500">Due: {new Date(assignment.dueDate).toLocaleDateString()}</p>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-gray-500">No recent assignments</p>
-          )}
-        </div>
-
-        {/* Recent Attendance */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Attendance</h3>
-          {recentAttendance.length > 0 ? (
-            <div className="space-y-4">
-              {recentAttendance.map(record => (
-                <div key={record.id} className="border-b pb-4">
-                  <h4 className="font-medium text-gray-900">{record.class}</h4>
-                  <p className="text-sm text-gray-500">Date: {new Date(record.date).toLocaleDateString()}</p>
-                  <p className="text-sm text-gray-500">
-                    Present: {record.students.filter(s => s.status === 'present').length} | 
-                    Absent: {record.students.filter(s => s.status === 'absent').length}
-                  </p>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-gray-500">No recent attendance records</p>
-          )}
+          <div className="space-y-4">
+            {recentAssignments.map((assignment) => (
+              <div key={assignment._id} className="border-b pb-2">
+                <p className="font-medium text-gray-900">{assignment.title}</p>
+                <p className="text-sm text-gray-600">Due: {new Date(assignment.dueDate).toLocaleDateString()}</p>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Recent Marks */}
         <div className="bg-white rounded-lg shadow-md p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Marks</h3>
-          {recentMarks.length > 0 ? (
-            <div className="space-y-4">
-              {recentMarks.map(mark => (
-                <div key={mark.id} className="border-b pb-4">
-                  <h4 className="font-medium text-gray-900">{mark.studentName}</h4>
-                  <p className="text-sm text-gray-500">Subject: {mark.subject}</p>
-                  <p className="text-sm text-gray-500">Marks: {mark.value}/{mark.totalMarks}</p>
-                  <p className="text-sm text-gray-500">Grade: {mark.grade}</p>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-gray-500">No recent marks</p>
-          )}
+          <div className="space-y-4">
+            {recentMarks.map((mark) => (
+              <div key={mark._id} className="border-b pb-2">
+                <p className="font-medium text-gray-900">{mark.studentName}</p>
+                <p className="text-sm text-gray-600">
+                  {mark.subject}: {mark.value}/{mark.totalMarks}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Recent Attendance */}
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Attendance</h3>
+          <div className="space-y-4">
+            {recentAttendance.map((record) => (
+              <div key={record._id} className="border-b pb-2">
+                <p className="font-medium text-gray-900">{record.class}</p>
+                <p className="text-sm text-gray-600">
+                  Date: {new Date(record.date).toLocaleDateString()}
+                </p>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Add Assignment Modal */}
+      {/* Modals */}
       {showAddAssignmentModal && (
         <AddAssignment
           onClose={() => setShowAddAssignmentModal(false)}
@@ -213,7 +191,6 @@ const StaffDashboard = () => {
         />
       )}
 
-      {/* Add Marks Modal */}
       {showAddMarksModal && (
         <AddMarks
           onClose={() => setShowAddMarksModal(false)}
@@ -221,11 +198,11 @@ const StaffDashboard = () => {
         />
       )}
 
-      {/* Add Attendance Modal */}
       {showAddAttendanceModal && (
         <AddAttendance
           onClose={() => setShowAddAttendanceModal(false)}
           onAdd={handleAddAttendance}
+          selectedDate={new Date().toISOString().split('T')[0]}
         />
       )}
     </div>

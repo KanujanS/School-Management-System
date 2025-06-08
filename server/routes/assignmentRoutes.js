@@ -6,7 +6,7 @@ import {
   updateAssignment,
   deleteAssignment
 } from '../controllers/assignmentController.js';
-import { protect, authorize } from '../middlewares/auth.js';
+import { protect, authorize } from '../middleware/auth.js';
 
 const router = express.Router();
 

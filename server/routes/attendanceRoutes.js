@@ -4,7 +4,7 @@ import {
   getAttendance,
   getAttendanceSummary
 } from '../controllers/attendanceController.js';
-import { protect, authorize } from '../middlewares/auth.js';
+import { protect, authorize } from '../middleware/auth.js';
 
 const router = express.Router();
 

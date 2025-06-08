@@ -14,6 +14,7 @@ const Assignments = () => {
   const [assignments, setAssignments] = useState([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     fetchAssignments();
@@ -22,11 +23,15 @@ const Assignments = () => {
   const fetchAssignments = async () => {
     try {
       setIsLoading(true);
-      const params = user.role === 'student' ? { class: user.class } : {};
+      setError(null);
+      const params = user?.role === 'student' ? { class: user.class } : {};
       const data = await assignmentsAPI.getAll(params);
-      setAssignments(data);
+      setAssignments(data || []);
     } catch (error) {
+      console.error('Error fetching assignments:', error);
+      setError(error.message);
       toast.error(error.message);
+      setAssignments([]);
     } finally {
       setIsLoading(false);
     }
@@ -43,6 +48,7 @@ const Assignments = () => {
       setShowAddModal(false);
       toast.success('Assignment created successfully');
     } catch (error) {
+      console.error('Error adding assignment:', error);
       toast.error(error.message);
     }
   };
@@ -51,9 +57,10 @@ const Assignments = () => {
     if (window.confirm('Are you sure you want to delete this assignment?')) {
       try {
         await assignmentsAPI.delete(assignmentId);
-        setAssignments(assignments.filter((a) => a._id !== assignmentId));
+        setAssignments(prevAssignments => prevAssignments.filter((a) => a._id !== assignmentId));
         toast.success('Assignment deleted successfully');
       } catch (error) {
+        console.error('Error deleting assignment:', error);
         toast.error(error.message);
       }
     }
@@ -71,6 +78,24 @@ const Assignments = () => {
     );
   }
 
+  // Error state
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="text-red-800 text-xl mb-4">⚠️</div>
+          <p className="text-gray-600">Error loading assignments: {error}</p>
+          <button 
+            onClick={fetchAssignments}
+            className="mt-4 px-4 py-2 bg-red-800 text-white rounded hover:bg-red-700"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -79,12 +104,12 @@ const Assignments = () => {
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Assignments</h1>
             <p className="mt-1 text-sm text-gray-500">
-              {user.role === 'staff' || user.role === 'admin'
+              {user?.role === 'staff' || user?.role === 'admin'
                 ? 'Manage class assignments'
-                : `View assignments for ${user.class}`}
+                : `View assignments for ${user?.class || 'your class'}`}
             </p>
           </div>
-          {(user.role === 'staff' || user.role === 'admin') && (
+          {(user?.role === 'staff' || user?.role === 'admin') && (
             <button
               onClick={handleAddAssignment}
               className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-900 hover:bg-red-800"
@@ -97,88 +122,87 @@ const Assignments = () => {
       </div>
 
       {/* Assignments List */}
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Title & Subject
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Class
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Added By
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Due Date
-                </th>
-                {(user.role === 'staff' || user.role === 'admin') && (
+      {assignments && assignments.length > 0 ? (
+        <div className="bg-white rounded-lg shadow-md overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
+                    Title & Subject
                   </th>
-                )}
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {assignments.map((assignment) => (
-                <tr key={assignment._id}>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">
-                      {assignment.title}
-                    </div>
-                    <div className="text-sm text-gray-500">
-                      {assignment.subject}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">
-                      {assignment.class}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">
-                      {assignment.createdBy?.name}
-                    </div>
-                    <div className="text-sm text-gray-500">
-                      {new Date(assignment.createdAt).toLocaleDateString()}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-500">
-                      {new Date(assignment.dueDate).toLocaleDateString()}
-                    </div>
-                  </td>
-                  {(user.role === 'staff' || user.role === 'admin') && (
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <button
-                        onClick={() => handleDelete(assignment._id)}
-                        className="text-red-900 hover:text-red-800"
-                        title="Delete Assignment"
-                      >
-                        <TrashIcon className="h-5 w-5" />
-                      </button>
-                    </td>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Class
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Added By
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Due Date
+                  </th>
+                  {(user?.role === 'staff' || user?.role === 'admin') && (
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
                   )}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {assignments.map((assignment) => (
+                  <tr key={assignment._id}>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900">
+                        {assignment.title}
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        {assignment.subject}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {assignment.class}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {assignment.createdBy?.name}
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        {new Date(assignment.createdAt).toLocaleDateString()}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-500">
+                        {new Date(assignment.dueDate).toLocaleDateString()}
+                      </div>
+                    </td>
+                    {(user?.role === 'staff' || user?.role === 'admin') && (
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <button
+                          onClick={() => handleDelete(assignment._id)}
+                          className="text-red-900 hover:text-red-800"
+                          title="Delete Assignment"
+                        >
+                          <TrashIcon className="h-5 w-5" />
+                        </button>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
-
-      {/* Empty State */}
-      {assignments.length === 0 && (
-        <div className="text-center py-12">
+      ) : (
+        <div className="text-center py-12 bg-white rounded-lg shadow-md">
           <DocumentPlusIcon className="mx-auto h-12 w-12 text-gray-400" />
           <h3 className="mt-2 text-sm font-medium text-gray-900">
             No assignments found
           </h3>
           <p className="mt-1 text-sm text-gray-500">
-            {user.role === 'staff' || user.role === 'admin'
+            {user?.role === 'staff' || user?.role === 'admin'
               ? 'Get started by creating a new assignment'
-              : `No assignments have been assigned for ${user.class}`}
+              : `No assignments have been assigned for ${user?.class || 'your class'}`}
           </p>
         </div>
       )}

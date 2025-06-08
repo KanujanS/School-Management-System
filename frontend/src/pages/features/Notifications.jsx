@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { mockApi } from '../../services/mockData';
+import { notificationsAPI } from '../../services/api';
 import {
   BellIcon,
   TrashIcon,
@@ -8,45 +8,59 @@ import {
   DocumentTextIcon,
   AcademicCapIcon
 } from '@heroicons/react/24/outline';
+import toast from 'react-hot-toast';
 
 const Notifications = () => {
   const { user } = useAuth();
   const [notifications, setNotifications] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const fetchNotifications = async () => {
       try {
-        const data = await mockApi.getNotifications(user.role, user.id);
+        setIsLoading(true);
+        const data = await notificationsAPI.getAll({ userId: user._id });
         setNotifications(data || []);
       } catch (error) {
         console.error('Error fetching notifications:', error);
+        toast.error('Failed to load notifications');
+      } finally {
+        setIsLoading(false);
       }
     };
 
-    fetchNotifications();
-  }, [user.role, user.id]);
+    if (user) {
+      fetchNotifications();
+    }
+  }, [user]);
 
   const handleMarkAsRead = async (notificationId) => {
     try {
+      await notificationsAPI.markAsRead(notificationId);
       const updatedNotifications = notifications.map((notification) =>
-        notification.id === notificationId
+        notification._id === notificationId
           ? { ...notification, isRead: true }
           : notification
       );
       setNotifications(updatedNotifications);
+      toast.success('Notification marked as read');
     } catch (error) {
       console.error('Error marking notification as read:', error);
+      toast.error('Failed to mark notification as read');
     }
   };
 
   const handleDelete = async (notificationId) => {
     try {
+      await notificationsAPI.delete(notificationId);
       const updatedNotifications = notifications.filter(
-        (notification) => notification.id !== notificationId
+        (notification) => notification._id !== notificationId
       );
       setNotifications(updatedNotifications);
+      toast.success('Notification deleted');
     } catch (error) {
       console.error('Error deleting notification:', error);
+      toast.error('Failed to delete notification');
     }
   };
 
@@ -60,6 +74,17 @@ const Notifications = () => {
         return <BellIcon className="h-6 w-6 text-gray-500" />;
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-800 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading notifications...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -85,7 +110,7 @@ const Notifications = () => {
       <div className="space-y-4">
         {notifications.map((notification) => (
           <div
-            key={notification.id}
+            key={notification._id}
             className={`bg-white rounded-lg shadow-md p-4 ${
               !notification.isRead ? 'border-l-4 border-blue-500' : ''
             }`}
@@ -109,7 +134,7 @@ const Notifications = () => {
                     </span>
                     {!notification.isRead && (
                       <button
-                        onClick={() => handleMarkAsRead(notification.id)}
+                        onClick={() => handleMarkAsRead(notification._id)}
                         className="text-blue-600 hover:text-blue-900"
                         title="Mark as read"
                       >
@@ -117,7 +142,7 @@ const Notifications = () => {
                       </button>
                     )}
                     <button
-                      onClick={() => handleDelete(notification.id)}
+                      onClick={() => handleDelete(notification._id)}
                       className="text-red-600 hover:text-red-900"
                       title="Delete notification"
                     >

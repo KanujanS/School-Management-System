@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { mockApi } from '../../services/mockData';
+import { attendanceAPI } from '../../services/api';
 import { PlusIcon, CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline';
 import AddAttendance from '../../components/AddAttendance';
+import toast from 'react-hot-toast';
 
 const Attendance = () => {
   const { user } = useAuth();
@@ -12,6 +13,7 @@ const Attendance = () => {
   const [selectedClass, setSelectedClass] = useState('all');
   const [showAddModal, setShowAddModal] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   // Predefined list of all classes
   const allClasses = [
@@ -32,24 +34,28 @@ const Attendance = () => {
     const fetchData = async () => {
       try {
         setIsLoading(true);
+        setError(null);
         
         // Fetch student's personal data if user is a student
-        if (user.role === 'student') {
-          const studentDetails = await mockApi.getStudentDetails(user.id);
+        if (user?.role === 'student') {
+          const studentDetails = await attendanceAPI.getStudentDetails(user._id);
           setStudentData(studentDetails);
         }
 
         // Fetch attendance data
-        const data = await mockApi.getAttendance(user.role, user.id);
+        const data = await attendanceAPI.getAll({
+          userId: user?._id,
+          role: user?.role,
+          date: selectedDate,
+          class: selectedClass !== 'all' ? selectedClass : undefined
+        });
         
-        // Filter attendance data for specific student if user is a student
-        const filteredData = user.role === 'student'
-          ? data.filter(record => record.studentId === user.id)
-          : data;
-
-        setAttendanceData(filteredData);
+        setAttendanceData(Array.isArray(data) ? data : []);
       } catch (error) {
         console.error('Error fetching data:', error);
+        setError(error.message);
+        toast.error('Failed to load attendance data');
+        setAttendanceData([]);
       } finally {
         setIsLoading(false);
       }
@@ -58,12 +64,21 @@ const Attendance = () => {
     if (user) {
       fetchData();
     }
-  }, [user]);
+  }, [user, selectedDate, selectedClass]);
 
   // Calculate attendance summary for student
   const calculateAttendanceSummary = () => {
+    if (!Array.isArray(attendanceData)) {
+      return {
+        totalDays: 0,
+        presentDays: 0,
+        absentDays: 0,
+        presentPercentage: 0
+      };
+    }
+
     const totalDays = attendanceData.length;
-    const presentDays = attendanceData.filter(record => record.status === 'present').length;
+    const presentDays = attendanceData.filter(record => record?.status === 'present').length;
     const absentDays = totalDays - presentDays;
     const presentPercentage = totalDays > 0 ? ((presentDays / totalDays) * 100).toFixed(1) : 0;
 
@@ -78,29 +93,26 @@ const Attendance = () => {
   // Handle adding new attendance record
   const handleAddAttendance = async (newAttendance) => {
     try {
-      // Create individual attendance records for each student
-      const newRecords = newAttendance.students.map(student => ({
-        id: Date.now() + Math.random(), // Temporary unique ID for mock data
-        studentId: student.id,
-        studentName: student.name,
-        class: newAttendance.class,
-        date: selectedDate,
-        status: student.status || 'present' // Default to present if status is missing
-      }));
-      
-      setAttendanceData(prevData => [...prevData, ...newRecords]);
+      const response = await attendanceAPI.create(newAttendance);
+      const newData = Array.isArray(response.data) ? response.data : [response.data];
+      setAttendanceData(prevData => [...prevData, ...newData]);
       setShowAddModal(false);
+      toast.success('Attendance records added successfully');
     } catch (error) {
       console.error('Error adding attendance:', error);
+      toast.error('Failed to add attendance records');
     }
   };
 
   // Filter attendance based on selected date and class
-  const filteredAttendance = attendanceData.filter(record => {
-    const dateMatch = record.date === selectedDate;
-    const classMatch = selectedClass === 'all' || record.class === selectedClass;
-    return dateMatch && classMatch;
-  });
+  const filteredAttendance = Array.isArray(attendanceData) 
+    ? attendanceData.filter(record => {
+        if (!record) return false;
+        const dateMatch = record.date === selectedDate;
+        const classMatch = selectedClass === 'all' || record.class === selectedClass;
+        return dateMatch && classMatch;
+      })
+    : [];
 
   // If loading or user not loaded yet, show loading state
   if (isLoading || !user) {
@@ -109,6 +121,24 @@ const Attendance = () => {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-800 mx-auto"></div>
           <p className="mt-4 text-gray-600">Loading attendance records...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If there's an error, show error state
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="text-red-800 text-xl mb-4">⚠️</div>
+          <p className="text-gray-600">Error loading attendance records: {error}</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="mt-4 px-4 py-2 bg-red-800 text-white rounded hover:bg-red-700"
+          >
+            Try Again
+          </button>
         </div>
       </div>
     );
@@ -123,9 +153,9 @@ const Attendance = () => {
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Attendance Records</h1>
-            {user.role === 'student' ? (
+            {user?.role === 'student' ? (
               <p className="mt-1 text-sm text-gray-500">
-                View your attendance records for {studentData?.class}
+                View your attendance records for {studentData?.class || 'your class'}
               </p>
             ) : (
               <p className="mt-1 text-sm text-gray-500">
@@ -133,7 +163,7 @@ const Attendance = () => {
               </p>
             )}
           </div>
-          {(user.role === 'staff' || user.role === 'admin') && (
+          {(user?.role === 'staff' || user?.role === 'admin') && (
             <button
               onClick={() => setShowAddModal(true)}
               className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-900 hover:bg-red-800"
@@ -146,7 +176,7 @@ const Attendance = () => {
       </div>
 
       {/* Student Attendance Summary */}
-      {user.role === 'student' && (
+      {user?.role === 'student' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="bg-white rounded-lg shadow-md p-6">
             <div className="flex items-center space-x-2">
@@ -190,7 +220,7 @@ const Attendance = () => {
           </div>
 
           {/* Class Filter - Only for staff/admin */}
-          {(user.role === 'staff' || user.role === 'admin') && (
+          {(user?.role === 'staff' || user?.role === 'admin') && (
             <div>
               <label className="block text-sm font-medium text-gray-700">Select Class</label>
               <select
@@ -225,12 +255,12 @@ const Attendance = () => {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                {user.role !== 'student' && (
+                {user?.role !== 'student' && (
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Student Details
                   </th>
                 )}
-                {user.role !== 'student' && (
+                {user?.role !== 'student' && (
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Class
                   </th>
@@ -246,7 +276,7 @@ const Attendance = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredAttendance.map((record) => (
                 <tr key={record.id}>
-                  {user.role !== 'student' && (
+                  {user?.role !== 'student' && (
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">
                         {record.studentName}
@@ -254,7 +284,7 @@ const Attendance = () => {
                       <div className="text-sm text-gray-500">ID: {record.studentId}</div>
                     </td>
                   )}
-                  {user.role !== 'student' && (
+                  {user?.role !== 'student' && (
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">{record.class}</div>
                     </td>
@@ -287,7 +317,7 @@ const Attendance = () => {
             No attendance records found
           </h3>
           <p className="mt-1 text-sm text-gray-500">
-            {user.role === 'student' 
+            {user?.role === 'student' 
               ? 'No attendance records found for the selected date'
               : 'Try selecting a different date or class'}
           </p>

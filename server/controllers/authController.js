@@ -158,4 +158,116 @@ export const getMe = async (req, res) => {
       error: error.message 
     });
   }
+};
+
+// @desc    Get all staff members
+// @route   GET /api/auth/staff
+// @access  Admin
+export const getAllStaff = async (req, res) => {
+  try {
+    const staffMembers = await User.find({ role: 'staff' })
+      .select('-password')
+      .sort({ createdAt: -1 });
+
+    res.json(staffMembers);
+  } catch (error) {
+    console.error('Get staff error:', error);
+    res.status(500).json({ 
+      message: 'Error fetching staff members',
+      error: error.message 
+    });
+  }
+};
+
+// @desc    Remove a staff member
+// @route   DELETE /api/auth/staff/:id
+// @access  Admin
+export const removeStaff = async (req, res) => {
+  try {
+    const staff = await User.findById(req.params.id);
+    
+    if (!staff) {
+      return res.status(404).json({ message: 'Staff member not found' });
+    }
+
+    if (staff.role !== 'staff') {
+      return res.status(400).json({ message: 'User is not a staff member' });
+    }
+
+    // Instead of deleting, set isActive to false
+    staff.isActive = false;
+    await staff.save();
+
+    res.json({ message: 'Staff member removed successfully' });
+  } catch (error) {
+    console.error('Remove staff error:', error);
+    res.status(500).json({ 
+      message: 'Error removing staff member',
+      error: error.message 
+    });
+  }
+};
+
+// @desc    Update staff status (active/inactive)
+// @route   PATCH /api/auth/staff/:id/status
+// @access  Admin
+export const updateStaffStatus = async (req, res) => {
+  try {
+    const { isActive } = req.body;
+    
+    if (typeof isActive !== 'boolean') {
+      return res.status(400).json({ message: 'isActive must be a boolean' });
+    }
+
+    const staff = await User.findById(req.params.id);
+    
+    if (!staff) {
+      return res.status(404).json({ message: 'Staff member not found' });
+    }
+
+    if (staff.role !== 'staff') {
+      return res.status(400).json({ message: 'User is not a staff member' });
+    }
+
+    staff.isActive = isActive;
+    await staff.save();
+
+    res.json({ message: 'Staff status updated successfully', isActive });
+  } catch (error) {
+    console.error('Update staff status error:', error);
+    res.status(500).json({ 
+      message: 'Error updating staff status',
+      error: error.message 
+    });
+  }
+};
+
+// @desc    Get dashboard statistics
+// @route   GET /api/auth/dashboard-stats
+// @access  Admin
+export const getDashboardStats = async (req, res) => {
+  try {
+    const [totalStudents, totalStaff] = await Promise.all([
+      User.countDocuments({ role: 'student' }),
+      User.countDocuments({ role: 'staff' })
+    ]);
+
+    const [teachingStaff, supportStaff] = await Promise.all([
+      User.countDocuments({ role: 'staff', staffType: 'teaching' }),
+      User.countDocuments({ role: 'staff', staffType: 'support' })
+    ]);
+
+    res.json({
+      totalStudents,
+      totalStaff,
+      teachingStaff,
+      supportStaff
+    });
+  } catch (error) {
+    console.error('Get dashboard stats error:', error);
+    res.status(500).json({ 
+      message: 'Error fetching dashboard statistics',
+      error: error.message 
+    });
+  }
 }; 

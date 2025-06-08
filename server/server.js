@@ -6,6 +6,7 @@ import authRoutes from './routes/authRoutes.js';
 import attendanceRoutes from './routes/attendanceRoutes.js';
 import assignmentRoutes from './routes/assignmentRoutes.js';
 import markRoutes from './routes/markRoutes.js';
+import notificationRoutes from './routes/notificationRoutes.js';
 
 // Initialize Express app
 const app = express();
@@ -27,7 +28,8 @@ app.get('/', (req, res) => {
       auth: '/api/auth',
       attendance: '/api/attendance',
       assignments: '/api/assignments',
-      marks: '/api/marks'
+      marks: '/api/marks',
+      notifications: '/api/notifications'
     }
   });
 });
@@ -37,6 +39,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/assignments', assignmentRoutes);
 app.use('/api/marks', markRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -47,4 +50,4 @@ app.use((err, req, res, next) => {
 //Port
 const PORT = process.env.PORT || 5002;
 
-app.listen(PORT, () => {console.log(`Server is running on port ${PORT}`)});
+app.listen(PORT, () => {console.log(`Server is running on port ${PORT}`);});

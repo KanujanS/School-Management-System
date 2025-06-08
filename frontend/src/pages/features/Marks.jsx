@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { mockApi } from '../../services/mockData';
+import { marksAPI } from '../../services/api';
 import {
   AcademicCapIcon,
   PencilSquareIcon,
@@ -8,6 +8,7 @@ import {
   PlusIcon
 } from '@heroicons/react/24/outline';
 import AddMarks from '../../components/AddMarks';
+import toast from 'react-hot-toast';
 
 const Marks = () => {
   const { user } = useAuth();
@@ -18,6 +19,8 @@ const Marks = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [editingMark, setEditingMark] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   // Predefined list of all classes (only used for staff/admin)
   const allClasses = [
@@ -104,19 +107,30 @@ const Marks = () => {
   useEffect(() => {
     const fetchMarks = async () => {
       try {
-        const data = await mockApi.getMarks(user.role, user.id);
-        // Filter marks for student users
-        const filteredData = user.role === 'student'
-          ? data.filter(mark => mark.studentId === user.id)
-          : data;
-        setMarks(filteredData);
+        setIsLoading(true);
+        setError(null);
+        const data = await marksAPI.getAll({
+          userId: user?._id,
+          role: user?.role,
+          class: selectedClass !== 'all' ? selectedClass : undefined,
+          subject: selectedSubject !== 'all' ? selectedSubject : undefined,
+          term: selectedTerm !== 'all' ? selectedTerm : undefined
+        });
+        setMarks(Array.isArray(data) ? data : []);
       } catch (error) {
         console.error('Error fetching marks:', error);
+        setError(error.message);
+        toast.error('Failed to load marks data');
+        setMarks([]);
+      } finally {
+        setIsLoading(false);
       }
     };
 
+    if (user) {
     fetchMarks();
-  }, [user.role, user.id]);
+    }
+  }, [user, selectedClass, selectedSubject, selectedTerm]);
 
   const handleEditMark = (mark) => {
     setEditingMark(mark);
@@ -125,35 +139,70 @@ const Marks = () => {
 
   const handleSaveMark = async (markId, newValue) => {
     try {
-      // In a real app, this would make an API call to update the mark
+      const response = await marksAPI.update(markId, { value: newValue });
       const updatedMarks = marks.map((mark) =>
-        mark.id === markId ? { ...mark, value: newValue } : mark
+        mark._id === markId ? response.data : mark
       );
       setMarks(updatedMarks);
       setIsEditing(false);
       setEditingMark(null);
+      toast.success('Mark updated successfully');
     } catch (error) {
       console.error('Error updating mark:', error);
+      toast.error('Failed to update mark');
     }
   };
 
-  const handleAddMark = (newMark) => {
-    setMarks(prevMarks => [...prevMarks, newMark]);
+  const handleAddMark = async (newMark) => {
+    try {
+      const response = await marksAPI.create(newMark);
+      const newData = Array.isArray(response.data) ? response.data : [response.data];
+      setMarks(prevMarks => [...prevMarks, ...newData]);
+      setShowAddModal(false);
+      toast.success('Mark added successfully');
+    } catch (error) {
+      console.error('Error adding mark:', error);
+      toast.error('Failed to add mark');
+    }
   };
 
   // Filter marks based on selections
-  const filteredMarks = marks.filter(mark => {
-    const classMatch = user.role === 'student' ? true : (selectedClass === 'all' || mark.class === selectedClass);
-    const subjectMatch = selectedSubject === 'all' || mark.subject === selectedSubject;
-    const termMatch = selectedTerm === 'all' || mark.term === selectedTerm;
-    return classMatch && subjectMatch && termMatch;
-  });
+  const filteredMarks = Array.isArray(marks) ? marks : [];
 
   const getGradeColor = (value) => {
+    if (!value) return 'text-gray-600';
     if (value >= 75) return 'text-green-600';
     if (value >= 50) return 'text-yellow-600';
     return 'text-red-600';
   };
+
+  if (isLoading || !user) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-800 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading marks...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="text-red-800 text-xl mb-4">⚠️</div>
+          <p className="text-gray-600">Error loading marks: {error}</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="mt-4 px-4 py-2 bg-red-800 text-white rounded hover:bg-red-700"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -163,11 +212,11 @@ const Marks = () => {
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Student Marks</h1>
             <p className="mt-1 text-sm text-gray-500">
-              {user.role === 'staff' || user.role === 'admin' ? 'Manage and view student marks' : 'View your marks'}
+              {user?.role === 'staff' || user?.role === 'admin' ? 'Manage and view student marks' : 'View your marks'}
             </p>
           </div>
           <div>
-            {(user.role === 'staff' || user.role === 'admin') && (
+            {(user?.role === 'staff' || user?.role === 'admin') && (
               <button
                 onClick={() => setShowAddModal(true)}
                 className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-900 hover:bg-red-800"
@@ -182,33 +231,33 @@ const Marks = () => {
 
       {/* Filters */}
       <div className="bg-white rounded-lg shadow-md p-6">
-        <div className={`grid grid-cols-1 ${user.role === 'student' ? 'md:grid-cols-2' : 'md:grid-cols-3'} gap-4`}>
+        <div className={`grid grid-cols-1 ${user?.role === 'student' ? 'md:grid-cols-2' : 'md:grid-cols-3'} gap-4`}>
           {/* Class Filter - Only for staff/admin */}
-          {(user.role === 'staff' || user.role === 'admin') && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Class</label>
-              <select
-                value={selectedClass}
-                onChange={(e) => setSelectedClass(e.target.value)}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-900 focus:ring-red-900 sm:text-sm"
-              >
-                <option value="all">All Classes</option>
-                <optgroup label="Ordinary Level">
-                  {allClasses
-                    .filter(className => className.startsWith('Grade'))
-                    .map(className => (
-                      <option key={className} value={className}>{className}</option>
-                    ))}
-                </optgroup>
-                <optgroup label="Advanced Level">
-                  {allClasses
-                    .filter(className => className.startsWith('A/L'))
-                    .map(className => (
-                      <option key={className} value={className}>{className}</option>
-                    ))}
-                </optgroup>
-              </select>
-            </div>
+          {(user?.role === 'staff' || user?.role === 'admin') && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Class</label>
+            <select
+              value={selectedClass}
+              onChange={(e) => setSelectedClass(e.target.value)}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-900 focus:ring-red-900 sm:text-sm"
+            >
+              <option value="all">All Classes</option>
+              <optgroup label="Ordinary Level">
+                {allClasses
+                  .filter(className => className.startsWith('Grade'))
+                  .map(className => (
+                    <option key={className} value={className}>{className}</option>
+                  ))}
+              </optgroup>
+              <optgroup label="Advanced Level">
+                {allClasses
+                  .filter(className => className.startsWith('A/L'))
+                  .map(className => (
+                    <option key={className} value={className}>{className}</option>
+                  ))}
+              </optgroup>
+            </select>
+          </div>
           )}
 
           {/* Subject Filter */}
@@ -266,24 +315,25 @@ const Marks = () => {
       </div>
 
       {/* Marks Table */}
+      {filteredMarks.length > 0 ? (
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                {(user.role === 'staff' || user.role === 'admin') && (
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Student
-                  </th>
-                )}
+                  {(user?.role === 'staff' || user?.role === 'admin') && (
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Student
+                </th>
+                  )}
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Subject
                 </th>
-                {(user.role === 'staff' || user.role === 'admin') && (
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Class
-                  </th>
-                )}
+                  {(user?.role === 'staff' || user?.role === 'admin') && (
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Class
+                </th>
+                  )}
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Term
                 </th>
@@ -297,30 +347,30 @@ const Marks = () => {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredMarks.map((mark) => (
-                <tr key={mark.id}>
-                  {(user.role === 'staff' || user.role === 'admin') && (
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{mark.studentName}</div>
-                      <div className="text-sm text-gray-500">ID: {mark.studentId}</div>
-                    </td>
-                  )}
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {mark.subject}
+                  <tr key={mark?._id || Math.random()}>
+                    {(user?.role === 'staff' || user?.role === 'admin') && (
+                  <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">{mark?.studentName}</div>
+                        <div className="text-sm text-gray-500">ID: {mark?.studentId}</div>
                   </td>
-                  {(user.role === 'staff' || user.role === 'admin') && (
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {mark.class}
-                    </td>
-                  )}
+                    )}
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {mark.term}
+                      {mark?.subject}
+                  </td>
+                    {(user?.role === 'staff' || user?.role === 'admin') && (
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {mark?.class}
+                  </td>
+                    )}
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {mark?.term}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {mark.value}/{mark.totalMarks}
+                      {mark?.value}/{mark?.totalMarks}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getGradeColor(mark.value)}`}>
-                      {mark.grade}
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getGradeColor(mark?.value)}`}>
+                        {mark?.grade}
                     </span>
                   </td>
                 </tr>
@@ -329,15 +379,13 @@ const Marks = () => {
           </table>
         </div>
       </div>
-
-      {/* Empty State */}
-      {filteredMarks.length === 0 && (
+      ) : (
         <div className="text-center py-12 bg-white rounded-lg shadow-md">
           <h3 className="mt-2 text-sm font-medium text-gray-900">
             No marks found
           </h3>
           <p className="mt-1 text-sm text-gray-500">
-            {user.role === 'student' 
+            {user?.role === 'student' 
               ? 'No marks available for the selected filters'
               : 'Try adjusting your filters to see more results'}
           </p>
