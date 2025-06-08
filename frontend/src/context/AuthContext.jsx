@@ -10,10 +10,17 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user is stored in localStorage
+    // Check if user and token are stored in localStorage
     const storedUser = localStorage.getItem('user');
-    if (storedUser) {
+    const storedToken = localStorage.getItem('token');
+    
+    if (storedUser && storedToken) {
       setUser(JSON.parse(storedUser));
+    } else {
+      // If either is missing, clear both for consistency
+      localStorage.removeItem('user');
+      localStorage.removeItem('token');
+      setUser(null);
     }
     setLoading(false);
   }, []);
@@ -42,6 +49,8 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
+    // Clear both token and user data
+    localStorage.removeItem('token');
     localStorage.removeItem('user');
     setUser(null);
     navigate('/login');

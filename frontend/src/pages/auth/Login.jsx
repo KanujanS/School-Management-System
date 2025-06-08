@@ -27,11 +27,13 @@ const Login = () => {
         password: formData.password
       });
       
-      // Store token in localStorage
-      localStorage.setItem('token', response.token);
+      // Store both token and user data
+      const { token, ...userData } = response;
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(userData));
       
       // Call the login function from context with the user data
-      login(response);
+      login(userData);
       
     } catch (error) {
       toast.error(error.message || 'Login failed. Please try again.');
