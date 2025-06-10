@@ -1,5 +1,7 @@
 import User from '../models/User.js';
+import Student from '../models/Student.js';
 import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
 
 // Generate JWT Token
 const generateToken = (id) => {
@@ -53,11 +55,21 @@ export const register = async (req, res) => {
     // Create user
     const user = await User.create({
       name,
-      email,
+      email: email.toLowerCase().trim(),
       password,
-      role,
+      role: ['staff', 'admin'].includes(role) ? role : 'student', // Allow both staff and admin roles
       ...(className && { class: className }),
       ...(studentId && { studentId })
+    });
+
+    // Log user creation result (without sensitive data)
+    console.log('User created:', {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      class: user.class,
+      studentId: user.studentId
     });
 
     if (!user) {
@@ -84,190 +96,299 @@ export const register = async (req, res) => {
 };
 
 // @desc    Login user
-// @route   POST /api/auth/login
+// @route   POST /auth/login
 // @access  Public
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Validate required fields
+    // Check if email and password are provided
     if (!email || !password) {
-      return res.status(400).json({ 
-        message: 'Please provide email and password',
-        required: ['email', 'password']
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide email and password'
       });
     }
 
-    // Check for user email and include password field
-    const user = await User.findOne({ email }).select('+password');
-    
-    // If no user found with this email
+    // Find user by email
+    const user = await User.findOne({ email });
     if (!user) {
-      return res.status(401).json({ message: 'Invalid email or password' });
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials'
+      });
     }
 
     // Check if password matches
-    const isMatch = await user.comparePassword(password);
-    
-    // If password doesn't match
+    const isMatch = await user.matchPassword(password);
     if (!isMatch) {
-      return res.status(401).json({ message: 'Invalid email or password' });
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials'
+      });
     }
 
-    // If everything is valid, send the response
+    // Create token
+    const token = jwt.sign(
+      { id: user._id },
+      process.env.JWT_SECRET,
+      { expiresIn: '30d' }
+    );
+
+    // Remove password from response
+    const userResponse = user.toObject();
+    delete userResponse.password;
+
     res.json({
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      class: user.class,
-      studentId: user.studentId,
-      token: generateToken(user._id)
+      success: true,
+      data: {
+        ...userResponse,
+        token
+      }
     });
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
+      success: false,
       message: 'Error logging in',
-      error: error.message 
+      error: error.message
     });
   }
 };
 
 // @desc    Get current user
-// @route   GET /api/auth/me
+// @route   GET /auth/me
 // @access  Private
 export const getMe = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id);
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
+    const user = await User.findById(req.user._id).select('-password');
     res.json({
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      class: user.class,
-      studentId: user.studentId
+      success: true,
+      data: user
     });
   } catch (error) {
-    console.error('Get profile error:', error);
-    res.status(500).json({ 
-      message: 'Error fetching user profile',
-      error: error.message 
+    console.error('Get me error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error getting user data',
+      error: error.message
     });
   }
 };
 
 // @desc    Get all staff members
-// @route   GET /api/auth/staff
-// @access  Admin
+// @route   GET /auth/staff
+// @access  Private/Admin
 export const getAllStaff = async (req, res) => {
   try {
-    const staffMembers = await User.find({ role: 'staff' })
-      .select('-password')
-      .sort({ createdAt: -1 });
-
-    res.json(staffMembers);
+    // Include original password in the response
+    const staff = await User.find({ role: 'staff' }).select('+originalPassword');
+    res.json({
+      success: true,
+      data: staff
+    });
   } catch (error) {
-    console.error('Get staff error:', error);
-    res.status(500).json({ 
-      message: 'Error fetching staff members',
-      error: error.message 
+    console.error('Get all staff error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error getting staff members',
+      error: error.message
     });
   }
 };
 
-// @desc    Remove a staff member
-// @route   DELETE /api/auth/staff/:id
-// @access  Admin
+// @desc    Update staff member
+// @route   PUT /auth/staff/:id
+// @access  Private/Admin
+export const updateStaff = async (req, res) => {
+  try {
+    const { name, email, staffType, department, isActive } = req.body;
+    const staffId = req.params.id;
+
+    // Find staff member
+    const staff = await User.findById(staffId);
+    if (!staff) {
+      return res.status(404).json({
+        success: false,
+        message: 'Staff member not found'
+      });
+    }
+
+    // Update fields
+    if (name) staff.name = name;
+    if (email) staff.email = email;
+    if (staffType) staff.staffType = staffType;
+    if (department) staff.department = department;
+    if (typeof isActive === 'boolean') staff.isActive = isActive;
+
+    // Save changes
+    await staff.save();
+
+    // Remove password from response
+    const staffResponse = staff.toObject();
+    delete staffResponse.password;
+
+    res.json({
+      success: true,
+      data: staffResponse
+    });
+  } catch (error) {
+    console.error('Update staff error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error updating staff member',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Remove staff member
+// @route   DELETE /auth/staff/:id
+// @access  Private/Admin
 export const removeStaff = async (req, res) => {
   try {
-    const staff = await User.findById(req.params.id);
-    
+    const staffId = req.params.id;
+
+    // Find and remove staff member
+    const staff = await User.findByIdAndDelete(staffId);
     if (!staff) {
-      return res.status(404).json({ message: 'Staff member not found' });
+      return res.status(404).json({
+        success: false,
+        message: 'Staff member not found'
+      });
     }
 
-    if (staff.role !== 'staff') {
-      return res.status(400).json({ message: 'User is not a staff member' });
-    }
-
-    // Instead of deleting, set isActive to false
-    staff.isActive = false;
-    await staff.save();
-
-    res.json({ message: 'Staff member removed successfully' });
+    res.json({
+      success: true,
+      message: 'Staff member removed successfully'
+    });
   } catch (error) {
     console.error('Remove staff error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
+      success: false,
       message: 'Error removing staff member',
-      error: error.message 
-    });
-  }
-};
-
-// @desc    Update staff status (active/inactive)
-// @route   PATCH /api/auth/staff/:id/status
-// @access  Admin
-export const updateStaffStatus = async (req, res) => {
-  try {
-    const { isActive } = req.body;
-    
-    if (typeof isActive !== 'boolean') {
-      return res.status(400).json({ message: 'isActive must be a boolean' });
-    }
-
-    const staff = await User.findById(req.params.id);
-    
-    if (!staff) {
-      return res.status(404).json({ message: 'Staff member not found' });
-    }
-
-    if (staff.role !== 'staff') {
-      return res.status(400).json({ message: 'User is not a staff member' });
-    }
-
-    staff.isActive = isActive;
-    await staff.save();
-
-    res.json({ message: 'Staff status updated successfully', isActive });
-  } catch (error) {
-    console.error('Update staff status error:', error);
-    res.status(500).json({ 
-      message: 'Error updating staff status',
-      error: error.message 
+      error: error.message
     });
   }
 };
 
 // @desc    Get dashboard statistics
-// @route   GET /api/auth/dashboard-stats
-// @access  Admin
+// @route   GET /auth/dashboard-stats
+// @access  Private/Admin
 export const getDashboardStats = async (req, res) => {
   try {
-    const [totalStudents, totalStaff] = await Promise.all([
-      User.countDocuments({ role: 'student' }),
-      User.countDocuments({ role: 'staff' })
+    // Get total students from Student model
+    const totalStudents = await Student.countDocuments();
+
+    // Get staff statistics
+    const staffStats = await User.aggregate([
+      { $match: { role: 'staff' } },
+      {
+        $group: {
+          _id: null,
+          totalStaff: { $sum: 1 },
+          teachingStaff: {
+            $sum: { $cond: [{ $eq: ['$staffType', 'teaching'] }, 1, 0] }
+          },
+          supportStaff: {
+            $sum: { $cond: [{ $eq: ['$staffType', 'support'] }, 1, 0] }
+          },
+          activeStaff: {
+            $sum: { $cond: [{ $eq: ['$isActive', true] }, 1, 0] }
+          },
+          inactiveStaff: {
+            $sum: { $cond: [{ $eq: ['$isActive', false] }, 1, 0] }
+          }
+        }
+      }
     ]);
 
-    const [teachingStaff, supportStaff] = await Promise.all([
-      User.countDocuments({ role: 'staff', staffType: 'teaching' }),
-      User.countDocuments({ role: 'staff', staffType: 'support' })
-    ]);
+    // Get total admins
+    const totalAdmins = await User.countDocuments({ role: 'admin' });
+
+    // Get recent staff members
+    const recentStaff = await User.find({ role: 'staff' })
+      .select('-password')
+      .sort({ createdAt: -1 })
+      .limit(5);
+
+    // Prepare the response
+    const stats = {
+      totalStudents,
+      totalStaff: staffStats[0]?.totalStaff || 0,
+      teachingStaff: staffStats[0]?.teachingStaff || 0,
+      supportStaff: staffStats[0]?.supportStaff || 0,
+      activeStaff: staffStats[0]?.activeStaff || 0,
+      inactiveStaff: staffStats[0]?.inactiveStaff || 0,
+      totalAdmins,
+      recentStaff
+    };
 
     res.json({
-      totalStudents,
-      totalStaff,
-      teachingStaff,
-      supportStaff
+      success: true,
+      data: stats
     });
   } catch (error) {
     console.error('Get dashboard stats error:', error);
-    res.status(500).json({ 
-      message: 'Error fetching dashboard statistics',
-      error: error.message 
+    res.status(500).json({
+      success: false,
+      message: 'Error getting dashboard statistics',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Create new staff member
+// @route   POST /auth/staff
+// @access  Private/Admin
+export const createStaff = async (req, res) => {
+  try {
+    const { name, email, password, staffType, department } = req.body;
+
+    // Validate required fields
+    if (!name || !email || !password || !staffType) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide all required fields'
+      });
+    }
+
+    // Check if staff already exists
+    const existingStaff = await User.findOne({ email });
+    if (existingStaff) {
+      return res.status(400).json({
+        success: false,
+        message: 'Staff member already exists'
+      });
+    }
+
+    // Create staff member
+    const staff = await User.create({
+      name,
+      email,
+      password,
+      role: 'staff',
+      staffType,
+      department: department || staffType // Use staffType as department if not provided
+    });
+
+    // Get the staff member with original password
+    const staffWithPassword = await User.findById(staff._id).select('+originalPassword');
+
+    // Remove password from response but keep originalPassword
+    const staffResponse = staffWithPassword.toObject();
+    delete staffResponse.password;
+
+    res.status(201).json({
+      success: true,
+      data: staffResponse
+    });
+  } catch (error) {
+    console.error('Create staff error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error creating staff member',
+      error: error.message
     });
   }
 }; 

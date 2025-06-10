@@ -3,47 +3,40 @@ import mongoose from 'mongoose';
 const assignmentSchema = new mongoose.Schema({
   title: {
     type: String,
-    required: [true, 'Assignment title is required'],
+    required: [true, 'Please add a title'],
     trim: true
   },
   description: {
     type: String,
-    required: [true, 'Assignment description is required'],
-    trim: true
+    required: [true, 'Please add a description']
   },
   subject: {
     type: String,
-    required: [true, 'Subject is required'],
-    trim: true,
-    uppercase: true
+    required: [true, 'Please add a subject'],
+    trim: true
   },
   class: {
     type: String,
-    required: [true, 'Class is required'],
-    trim: true,
-    uppercase: true
+    required: [true, 'Please add a class'],
+    trim: true
   },
   dueDate: {
     type: Date,
-    required: [true, 'Due date is required']
+    required: [true, 'Please add a due date']
   },
   totalMarks: {
     type: Number,
-    required: [true, 'Total marks is required'],
-    min: [0, 'Total marks cannot be negative']
+    required: [true, 'Please add total marks']
   },
   attachments: [{
     fileName: String,
     fileUrl: String,
-    uploadedAt: {
-      type: Date,
-      default: Date.now
-    }
+    uploadedAt: Date
   }],
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: [true, 'Assignment creator is required']
+    required: true
   }
 }, {
   timestamps: true

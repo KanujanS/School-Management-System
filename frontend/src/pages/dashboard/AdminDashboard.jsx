@@ -27,8 +27,13 @@ const AdminDashboard = () => {
     try {
       setIsLoading(true);
       setError(null);
-      const stats = await authAPI.getDashboardStats();
-      setStatistics(stats);
+      const response = await authAPI.getDashboardStats();
+      
+      if (response.success && response.data) {
+        setStatistics(response.data);
+      } else {
+        throw new Error('Invalid response format');
+      }
     } catch (error) {
       console.error('Error fetching dashboard statistics:', error);
       setError(error.message);
@@ -38,7 +43,11 @@ const AdminDashboard = () => {
         totalStudents: 0,
         totalStaff: 0,
         teachingStaff: 0,
-        supportStaff: 0
+        supportStaff: 0,
+        activeStaff: 0,
+        inactiveStaff: 0,
+        totalAdmins: 0,
+        recentStaff: []
       });
     } finally {
       setIsLoading(false);

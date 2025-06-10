@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   UserPlusIcon, 
@@ -7,11 +7,29 @@ import {
   ArrowLeftIcon
 } from '@heroicons/react/24/outline';
 import { FaUserGraduate } from 'react-icons/fa';
+import { studentAPI } from '../../services/api';
+import toast from 'react-hot-toast';
+import PasswordField from '../../components/PasswordField';
+
+// Helper function to generate a random password
+const generatePassword = () => {
+  const length = 8;
+  const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let password = '';
+  for (let i = 0; i < length; i++) {
+    const randomIndex = Math.floor(Math.random() * charset.length);
+    password += charset[randomIndex];
+  }
+  return password;
+};
 
 const ClassDetails = () => {
   const { gradeId, division, stream } = useParams();
   const navigate = useNavigate();
   const [showAddStudentModal, setShowAddStudentModal] = useState(false);
+  const [students, setStudents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   // Stream information mapping for A/L streams
   const streamInfo = {
@@ -40,33 +58,6 @@ const ClassDetails = () => {
     name: 'Unknown Stream'
   }) : null;
 
-  const [students, setStudents] = useState([
-    {
-      id: 1,
-      name: stream ? 'John Doe' : 'John Perera',
-      admissionNumber: stream ? 'AL2024001' : '2024001',
-      gender: 'Male',
-      dateOfBirth: '2010-05-15',
-      address: '123 School Lane, Mahiyangana',
-      parentName: 'David Perera',
-      contactNumber: '+94 77 123 4567',
-      email: 'john.perera@student.com',
-      attendance: '95%'
-    },
-    {
-      id: 2,
-      name: stream ? 'Jane Smith' : 'Sarah Silva',
-      admissionNumber: stream ? 'AL2024002' : '2024002',
-      gender: 'Female',
-      dateOfBirth: '2010-06-20',
-      address: '456 Temple Road, Mahiyangana',
-      parentName: 'Mary Silva',
-      contactNumber: '+94 77 234 5678',
-      email: 'sarah.silva@student.com',
-      attendance: '92%'
-    }
-  ]);
-
   const [newStudent, setNewStudent] = useState({
     name: '',
     admissionNumber: '',
@@ -76,8 +67,34 @@ const ClassDetails = () => {
     parentName: '',
     contactNumber: '',
     email: '',
-    attendance: '100%'
+    password: generatePassword() // Generate initial password
   });
+
+  useEffect(() => {
+    fetchStudents();
+  }, [gradeId, division, stream]);
+
+  const fetchStudents = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = stream 
+        ? await studentAPI.getStudentsByStream(stream)
+        : await studentAPI.getStudentsByClass(gradeId, division);
+      
+      if (response.success) {
+        setStudents(response.data);
+      } else {
+        throw new Error(response.message || 'Failed to fetch students');
+      }
+    } catch (error) {
+      console.error('Error fetching students:', error);
+      setError(error.message);
+      toast.error('Failed to load students');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -87,19 +104,44 @@ const ClassDetails = () => {
     }));
   };
 
-  const handleAddStudent = (e) => {
+  const handleAddStudent = async (e) => {
     e.preventDefault();
-    const newStudentData = {
-      id: students.length + 1,
-      ...newStudent
-    };
-    setStudents(prev => [...prev, newStudentData]);
-    handleCloseModal();
+    try {
+      const studentData = {
+        ...newStudent,
+        ...(stream ? { stream } : { grade: gradeId, division })
+      };
+
+      const response = await studentAPI.addStudent(studentData);
+      
+      if (response.success) {
+        setStudents(prev => [...prev, response.data]);
+        toast.success('Student added successfully');
+        handleCloseModal();
+      } else {
+        throw new Error(response.message || 'Failed to add student');
+      }
+    } catch (error) {
+      console.error('Error adding student:', error);
+      toast.error(error.message || 'Failed to add student');
+    }
   };
 
-  const handleDeleteStudent = (studentId) => {
+  const handleDeleteStudent = async (studentId) => {
     if (window.confirm('Are you sure you want to remove this student?')) {
-      setStudents(students.filter(student => student.id !== studentId));
+      try {
+        const response = await studentAPI.deleteStudent(studentId);
+        
+        if (response.success) {
+          setStudents(students.filter(student => student._id !== studentId));
+          toast.success('Student removed successfully');
+        } else {
+          throw new Error(response.message || 'Failed to remove student');
+        }
+      } catch (error) {
+        console.error('Error deleting student:', error);
+        toast.error(error.message || 'Failed to remove student');
+      }
     }
   };
 
@@ -114,9 +156,37 @@ const ClassDetails = () => {
       parentName: '',
       contactNumber: '',
       email: '',
-      attendance: '100%'
+      password: generatePassword() // Generate new password for next student
     });
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-800 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading students...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="text-red-800 text-xl mb-4">⚠️</div>
+          <p className="text-gray-600">{error}</p>
+          <button 
+            onClick={fetchStudents}
+            className="mt-4 px-4 py-2 bg-red-800 text-white rounded hover:bg-red-700"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-8">
@@ -175,7 +245,7 @@ const ClassDetails = () => {
                   Parent Details
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Email
+                  Email & Password
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
@@ -184,7 +254,7 @@ const ClassDetails = () => {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {students.map((student) => (
-                <tr key={student.id}>
+                <tr key={student._id}>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <div className="ml-4">
@@ -197,7 +267,7 @@ const ClassDetails = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900">{student.admissionNumber}</div>
-                    <div className="text-sm text-gray-500">Attendance: {student.attendance}</div>
+                    <div className="text-sm text-gray-500">Attendance: {student.attendance || 'N/A'}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900">{student.parentName}</div>
@@ -205,10 +275,11 @@ const ClassDetails = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900">{student.email}</div>
+                    <PasswordField password={student.password || 'Not available'} className="text-sm" />
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <button
-                      onClick={() => handleDeleteStudent(student.id)}
+                      onClick={() => handleDeleteStudent(student._id)}
                       className="text-red-900 hover:text-red-800"
                     >
                       <TrashIcon className="h-5 w-5" />
@@ -268,6 +339,7 @@ const ClassDetails = () => {
                   name="gender"
                   value={newStudent.gender}
                   onChange={handleInputChange}
+                  required
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-900 focus:ring-red-900 sm:text-sm"
                 >
                   <option value="Male">Male</option>
@@ -289,18 +361,18 @@ const ClassDetails = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700">Address</label>
-                <textarea
+                <input
+                  type="text"
                   name="address"
                   value={newStudent.address}
                   onChange={handleInputChange}
                   required
-                  rows={3}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-900 focus:ring-red-900 sm:text-sm"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700">Parent/Guardian Name</label>
+                <label className="block text-sm font-medium text-gray-700">Parent's Name</label>
                 <input
                   type="text"
                   name="parentName"
@@ -335,17 +407,30 @@ const ClassDetails = () => {
                 />
               </div>
 
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Password</label>
+                <div className="mt-1">
+                  <PasswordField 
+                    password={newStudent.password} 
+                    className="w-full bg-gray-50 p-2 rounded-md border border-gray-300" 
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    This password will be used for LMS access. The student can change it after logging in.
+                  </p>
+                </div>
+              </div>
+
               <div className="flex justify-end space-x-3 mt-6">
                 <button
                   type="button"
                   onClick={handleCloseModal}
-                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-900 hover:bg-red-800"
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-900 rounded-md hover:bg-red-800"
                 >
                   Add Student
                 </button>

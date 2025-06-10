@@ -1,181 +1,297 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../../context/AuthContext';
-import { notificationsAPI } from '../../services/api';
 import {
-  BellIcon,
-  TrashIcon,
-  CheckCircleIcon,
-  DocumentTextIcon,
-  AcademicCapIcon
-} from '@heroicons/react/24/outline';
+  Box,
+  Typography,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemAvatar,
+  Avatar,
+  ListItemSecondaryAction,
+  IconButton,
+  Paper,
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  CircularProgress
+} from '@mui/material';
+import {
+  Notifications as NotificationsIcon,
+  Delete as DeleteIcon,
+  Add as AddIcon
+} from '@mui/icons-material';
+import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
 
 const Notifications = () => {
   const { user } = useAuth();
   const [notifications, setNotifications] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [openAddDialog, setOpenAddDialog] = useState(false);
+  const [newNotification, setNewNotification] = useState({
+    title: '',
+    message: '',
+    type: 'general',
+    recipients: 'all'
+  });
+
+  // Sample notification types
+  const notificationTypes = [
+    { value: 'general', label: 'General' },
+    { value: 'academic', label: 'Academic' },
+    { value: 'event', label: 'Event' },
+    { value: 'urgent', label: 'Urgent' }
+  ];
+
+  // Sample recipient groups
+  const recipientGroups = [
+    { value: 'all', label: 'All Users' },
+    { value: 'staff', label: 'Staff Only' },
+    { value: 'students', label: 'Students Only' },
+    { value: 'parents', label: 'Parents Only' }
+  ];
+
+  // Sample notifications data
+  const sampleNotifications = [
+    {
+      _id: '1',
+      title: 'School Closure Notice',
+      message: 'School will be closed tomorrow due to inclement weather.',
+      type: 'urgent',
+      createdAt: new Date(Date.now() - 1000 * 60 * 60),
+      createdBy: 'Admin'
+    },
+    {
+      _id: '2',
+      title: 'Parent-Teacher Meeting',
+      message: 'Parent-teacher meetings are scheduled for next week.',
+      type: 'general',
+      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24),
+      createdBy: 'Admin'
+    },
+    {
+      _id: '3',
+      title: 'Exam Schedule Released',
+      message: 'The final exam schedule has been published.',
+      type: 'academic',
+      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2),
+      createdBy: 'Admin'
+    }
+  ];
 
   useEffect(() => {
+    // Simulate API call
     const fetchNotifications = async () => {
       try {
-        setIsLoading(true);
-        const data = await notificationsAPI.getAll({ userId: user._id });
-        setNotifications(data || []);
+        setLoading(true);
+        // Simulate API delay
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        setNotifications(sampleNotifications);
       } catch (error) {
         console.error('Error fetching notifications:', error);
         toast.error('Failed to load notifications');
       } finally {
-        setIsLoading(false);
+        setLoading(false);
       }
     };
 
-    if (user) {
-      fetchNotifications();
-    }
-  }, [user]);
+    fetchNotifications();
+  }, []);
 
-  const handleMarkAsRead = async (notificationId) => {
+  const handleAddNotification = async () => {
     try {
-      await notificationsAPI.markAsRead(notificationId);
-      const updatedNotifications = notifications.map((notification) =>
-        notification._id === notificationId
-          ? { ...notification, isRead: true }
-          : notification
-      );
-      setNotifications(updatedNotifications);
-      toast.success('Notification marked as read');
+      if (!newNotification.title || !newNotification.message) {
+        toast.error('Please fill in all required fields');
+        return;
+      }
+
+      // Simulate API call
+      const notification = {
+        _id: Date.now().toString(),
+        ...newNotification,
+        createdAt: new Date(),
+        createdBy: user.name
+      };
+
+      setNotifications(prev => [notification, ...prev]);
+      setOpenAddDialog(false);
+      setNewNotification({
+        title: '',
+        message: '',
+        type: 'general',
+        recipients: 'all'
+      });
+      toast.success('Notification sent successfully');
     } catch (error) {
-      console.error('Error marking notification as read:', error);
-      toast.error('Failed to mark notification as read');
+      console.error('Error sending notification:', error);
+      toast.error('Failed to send notification');
     }
   };
 
-  const handleDelete = async (notificationId) => {
+  const handleDeleteNotification = async (notificationId) => {
     try {
-      await notificationsAPI.delete(notificationId);
-      const updatedNotifications = notifications.filter(
-        (notification) => notification._id !== notificationId
-      );
-      setNotifications(updatedNotifications);
-      toast.success('Notification deleted');
+      setNotifications(prev => prev.filter(n => n._id !== notificationId));
+      toast.success('Notification deleted successfully');
     } catch (error) {
       console.error('Error deleting notification:', error);
       toast.error('Failed to delete notification');
     }
   };
 
-  const getNotificationIcon = (category) => {
-    switch (category) {
-      case 'assignment':
-        return <DocumentTextIcon className="h-6 w-6 text-blue-500" />;
-      case 'marks':
-        return <AcademicCapIcon className="h-6 w-6 text-green-500" />;
+  const getNotificationColor = (type) => {
+    switch (type) {
+      case 'urgent':
+        return '#f44336';
+      case 'academic':
+        return '#2196f3';
+      case 'event':
+        return '#4caf50';
       default:
-        return <BellIcon className="h-6 w-6 text-gray-500" />;
+        return '#757575';
     }
   };
 
-  if (isLoading) {
+  if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-800 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading notifications...</p>
-        </div>
-      </div>
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+        <CircularProgress />
+      </Box>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Notifications</h1>
-            <p className="mt-1 text-sm text-gray-500">
-              Stay updated with assignment and marks updates
-            </p>
-          </div>
-          <div className="flex items-center space-x-2">
-            <BellIcon className="h-5 w-5 text-blue-500" />
-            <span className="text-sm font-medium text-gray-700">
-              {notifications.filter((n) => !n.isRead).length} Unread
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Notifications List */}
-      <div className="space-y-4">
-        {notifications.map((notification) => (
-          <div
-            key={notification._id}
-            className={`bg-white rounded-lg shadow-md p-4 ${
-              !notification.isRead ? 'border-l-4 border-blue-500' : ''
-            }`}
+    <Box p={3}>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+        <Typography variant="h5">Notifications</Typography>
+        {user?.role === 'admin' && (
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => setOpenAddDialog(true)}
           >
-            <div className="flex items-start space-x-4">
-              <div className="flex-shrink-0">
-                {getNotificationIcon(notification.category)}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between">
-                  <p
-                    className={`text-sm font-medium ${
-                      notification.isRead ? 'text-gray-600' : 'text-gray-900'
-                    }`}
-                  >
-                    {notification.title}
-                  </p>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-xs text-gray-500">
-                      {new Date(notification.date).toLocaleDateString()}
-                    </span>
-                    {!notification.isRead && (
-                      <button
-                        onClick={() => handleMarkAsRead(notification._id)}
-                        className="text-blue-600 hover:text-blue-900"
-                        title="Mark as read"
-                      >
-                        <CheckCircleIcon className="h-5 w-5" />
-                      </button>
-                    )}
-                    <button
-                      onClick={() => handleDelete(notification._id)}
-                      className="text-red-600 hover:text-red-900"
-                      title="Delete notification"
-                    >
-                      <TrashIcon className="h-5 w-5" />
-                    </button>
-                  </div>
-                </div>
-                <p
-                  className={`mt-1 text-sm ${
-                    notification.isRead ? 'text-gray-500' : 'text-gray-700'
-                  }`}
-                >
-                  {notification.message}
-                </p>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
+            Send Notification
+          </Button>
+        )}
+      </Box>
 
-      {/* Empty State */}
-      {notifications.length === 0 && (
-        <div className="text-center py-12">
-          <BellIcon className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-2 text-sm font-medium text-gray-900">
-            No notifications
-          </h3>
-          <p className="mt-1 text-sm text-gray-500">
-            You're all caught up!
-          </p>
-        </div>
+      {notifications.length === 0 ? (
+        <Paper sx={{ p: 3, textAlign: 'center' }}>
+          <Typography color="textSecondary">No notifications found</Typography>
+        </Paper>
+      ) : (
+        <List>
+          {notifications.map((notification) => (
+            <Paper key={notification._id} sx={{ mb: 2 }}>
+              <ListItem>
+                <ListItemAvatar>
+                  <Avatar sx={{ bgcolor: getNotificationColor(notification.type) }}>
+                    <NotificationsIcon />
+                  </Avatar>
+                </ListItemAvatar>
+                <ListItemText
+                  primary={notification.title}
+                  secondary={
+                    <React.Fragment>
+                      <Typography component="span" variant="body2" color="textPrimary">
+                        {notification.message}
+                      </Typography>
+                      <br />
+                      <Typography component="span" variant="caption" color="textSecondary">
+                        {new Date(notification.createdAt).toLocaleString()} - {notification.createdBy}
+                      </Typography>
+                    </React.Fragment>
+                  }
+                />
+                {user?.role === 'admin' && (
+                  <ListItemSecondaryAction>
+                    <IconButton
+                      edge="end"
+                      color="error"
+                      onClick={() => handleDeleteNotification(notification._id)}
+                    >
+                      <DeleteIcon />
+                    </IconButton>
+                  </ListItemSecondaryAction>
+                )}
+              </ListItem>
+            </Paper>
+          ))}
+        </List>
       )}
-    </div>
+
+      {/* Add Notification Dialog */}
+      <Dialog
+        open={openAddDialog}
+        onClose={() => setOpenAddDialog(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Send New Notification</DialogTitle>
+        <DialogContent>
+          <Box sx={{ pt: 2 }}>
+            <TextField
+              fullWidth
+              label="Title"
+              value={newNotification.title}
+              onChange={(e) => setNewNotification(prev => ({ ...prev, title: e.target.value }))}
+              margin="normal"
+              required
+            />
+            <TextField
+              fullWidth
+              label="Message"
+              value={newNotification.message}
+              onChange={(e) => setNewNotification(prev => ({ ...prev, message: e.target.value }))}
+              margin="normal"
+              multiline
+              rows={4}
+              required
+            />
+            <FormControl fullWidth margin="normal">
+              <InputLabel>Type</InputLabel>
+              <Select
+                value={newNotification.type}
+                onChange={(e) => setNewNotification(prev => ({ ...prev, type: e.target.value }))}
+                label="Type"
+              >
+                {notificationTypes.map(type => (
+                  <MenuItem key={type.value} value={type.value}>
+                    {type.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl fullWidth margin="normal">
+              <InputLabel>Recipients</InputLabel>
+              <Select
+                value={newNotification.recipients}
+                onChange={(e) => setNewNotification(prev => ({ ...prev, recipients: e.target.value }))}
+                label="Recipients"
+              >
+                {recipientGroups.map(group => (
+                  <MenuItem key={group.value} value={group.value}>
+                    {group.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenAddDialog(false)}>Cancel</Button>
+          <Button onClick={handleAddNotification} variant="contained">
+            Send
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
   );
 };
 

@@ -1,21 +1,26 @@
 import express from 'express';
+import { protect } from '../middleware/authMiddleware.js';
 import {
-  addAttendance,
+  createAttendance,
   getAttendance,
-  getAttendanceSummary
+  getAttendanceById,
+  updateAttendance,
+  deleteAttendance
 } from '../controllers/attendanceController.js';
-import { protect, authorize } from '../middleware/auth.js';
 
 const router = express.Router();
 
 // Protect all routes
 router.use(protect);
 
-// Routes accessible by all authenticated users
-router.get('/', getAttendance);
-router.get('/summary', getAttendanceSummary);
+// Attendance routes
+router.route('/')
+  .get(getAttendance)
+  .post(createAttendance);
 
-// Routes only for staff and admin
-router.post('/', authorize('staff', 'admin'), addAttendance);
+router.route('/:id')
+  .get(getAttendanceById)
+  .put(updateAttendance)
+  .delete(deleteAttendance);
 
 export default router; 

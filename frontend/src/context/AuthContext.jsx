@@ -15,7 +15,18 @@ export const AuthProvider = ({ children }) => {
     const storedToken = localStorage.getItem('token');
     
     if (storedUser && storedToken) {
-      setUser(JSON.parse(storedUser));
+      const userData = JSON.parse(storedUser);
+      // Check if user is active
+      if (!userData.isActive) {
+        // Clear stored data if user is inactive
+        localStorage.removeItem('user');
+        localStorage.removeItem('token');
+        setUser(null);
+        toast.error('Your account has been deactivated. Please contact the administrator.');
+        navigate('/login');
+      } else {
+        setUser(userData);
+      }
     } else {
       // If either is missing, clear both for consistency
       localStorage.removeItem('user');
@@ -23,11 +34,24 @@ export const AuthProvider = ({ children }) => {
       setUser(null);
     }
     setLoading(false);
-  }, []);
+  }, [navigate]);
 
   const login = (userData) => {
+    // Validate user data
+    if (!userData || !userData.token) {
+      toast.error('Invalid login data received');
+      return;
+    }
+
+    // Check if user is active before logging in
+    if (!userData.isActive) {
+      toast.error('Your account has been deactivated. Please contact the administrator.');
+      return;
+    }
+
     // Store user data in localStorage
     localStorage.setItem('user', JSON.stringify(userData));
+    localStorage.setItem('token', userData.token);
     setUser(userData);
     
     // Navigate based on user role
@@ -43,6 +67,7 @@ export const AuthProvider = ({ children }) => {
         break;
       default:
         navigate('/login');
+        return; // Don't show success message if role is invalid
     }
     
     toast.success('Login successful!');

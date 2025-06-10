@@ -1,115 +1,326 @@
-import Attendance from '../models/attendance.js';
+import Attendance from '../models/Attendance.js';
 import User from '../models/User.js';
 
-// @desc    Add attendance records
-// @route   POST /api/attendance
-// @access  Private (Staff/Admin)
-export const addAttendance = async (req, res) => {
+// @desc    Get students by class
+// @route   GET /api/users/students
+// @access  Private/Staff
+export const getStudentsByClass = async (req, res) => {
   try {
-    const { students, class: className, date } = req.body;
-
-    // Validate input
-    if (!students || !className || !date) {
-      return res.status(400).json({ message: 'Please provide all required fields' });
+    const { class: className } = req.query;
+    
+    if (!className) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a class'
+      });
     }
 
-    // Create attendance records for each student
-    const attendanceRecords = await Promise.all(
-      students.map(async (student) => {
-        // Check if attendance already exists
-        const existingAttendance = await Attendance.findOne({
-          studentId: student.id,
-          date: new Date(date)
-        });
+    console.log('Fetching students for class:', className); // Debug log
 
-        if (existingAttendance) {
-          // Update existing attendance
-          existingAttendance.status = student.status;
-          return await existingAttendance.save();
-        }
+    // Find all students in the class
+    const students = await User.find({
+      role: 'student',
+      class: className
+    }).select('_id name studentId class');
 
-        // Create new attendance record
-        return await Attendance.create({
-          studentId: student.id,
-          status: student.status,
-          class: className,
-          date: new Date(date),
-          markedBy: req.user._id
-        });
-      })
-    );
+    console.log('Found students:', students); // Debug log
 
-    res.status(201).json(attendanceRecords);
+    if (!students || students.length === 0) {
+      return res.json({
+        success: true,
+        data: [],
+        message: 'No students found in this class'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: students
+    });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('Error fetching students:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch students',
+      error: error.message
+    });
   }
 };
 
-// @desc    Get attendance records
+// @desc    Create a new attendance record
+// @route   POST /api/attendance
+// @access  Private/Staff
+export const createAttendance = async (req, res) => {
+  try {
+    const { class: className, date, students } = req.body;
+
+    // Validate required fields
+    if (!className || !date || !students || !Array.isArray(students) || students.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide class, date, and students array'
+      });
+    }
+
+    // Validate student entries
+    for (const student of students) {
+      if (!student.student || !student.status || !['present', 'absent'].includes(student.status)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid student data. Each student must have an ID and status (present/absent)'
+        });
+      }
+    }
+
+    // Check if attendance for this class and date already exists
+    const existingAttendance = await Attendance.findOne({
+      class: className,
+      date: new Date(date)
+    });
+
+    if (existingAttendance) {
+      return res.status(400).json({
+        success: false,
+        message: 'Attendance for this class and date already exists'
+      });
+    }
+
+    // Create attendance record
+    const attendance = await Attendance.create({
+      class: className,
+      date: new Date(date),
+      students: students.map(s => ({
+        student: s.student,
+        status: s.status
+      })),
+      createdBy: req.user._id
+    });
+
+    // Populate references
+    await attendance.populate([
+      {
+        path: 'students.student',
+        select: 'name admissionNumber'
+      },
+      {
+        path: 'createdBy',
+        select: 'name'
+      }
+    ]);
+
+    res.status(201).json({
+      success: true,
+      data: attendance
+    });
+  } catch (error) {
+    console.error('Error creating attendance record:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create attendance record',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Get all attendance records
 // @route   GET /api/attendance
 // @access  Private
 export const getAttendance = async (req, res) => {
   try {
-    const { date, class: className } = req.query;
-    let query = {};
-
-    // Add date filter if provided
-    if (date) {
-      const startDate = new Date(date);
-      startDate.setHours(0, 0, 0, 0);
-      const endDate = new Date(date);
-      endDate.setHours(23, 59, 59, 999);
-      query.date = { $gte: startDate, $lte: endDate };
-    }
-
-    // Add class filter if provided
-    if (className && className !== 'all') {
+    const { class: className, date, staffId, limit = 10 } = req.query;
+    
+    // Build query
+    const query = {};
+    
+    // If class is provided, filter by class
+    if (className) {
       query.class = className;
     }
 
-    // For students, only show their own attendance
-    if (req.user.role === 'student') {
-      query.studentId = req.user._id;
+    // If date is provided, filter by date
+    if (date) {
+      query.date = new Date(date);
+    }
+
+    // If staffId is provided, filter by creator
+    if (staffId) {
+      query.createdBy = staffId;
     }
 
     const attendance = await Attendance.find(query)
-      .populate('studentId', 'name studentId class')
-      .populate('markedBy', 'name')
-      .sort({ date: -1 });
+      .sort({ date: -1, createdAt: -1 })
+      .limit(Number(limit))
+      .populate([
+        {
+          path: 'students.student',
+          select: 'name admissionNumber'
+        },
+        {
+          path: 'createdBy',
+          select: 'name'
+        }
+      ]);
 
-    res.json(attendance);
+    res.json({
+      success: true,
+      count: attendance.length,
+      data: attendance
+    });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('Error fetching attendance records:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch attendance records',
+      error: error.message
+    });
   }
 };
 
-// @desc    Get attendance summary
-// @route   GET /api/attendance/summary
+// @desc    Get single attendance record
+// @route   GET /api/attendance/:id
 // @access  Private
-export const getAttendanceSummary = async (req, res) => {
+export const getAttendanceById = async (req, res) => {
   try {
-    const { studentId } = req.query;
-    const query = studentId ? { studentId } : {};
+    const attendance = await Attendance.findById(req.params.id)
+      .populate([
+        {
+          path: 'students.student',
+          select: 'name admissionNumber'
+        },
+        {
+          path: 'createdBy',
+          select: 'name'
+        }
+      ]);
 
-    if (req.user.role === 'student') {
-      query.studentId = req.user._id;
+    if (!attendance) {
+      return res.status(404).json({
+        success: false,
+        message: 'Attendance record not found'
+      });
     }
 
-    const totalDays = await Attendance.countDocuments(query);
-    const presentDays = await Attendance.countDocuments({
-      ...query,
-      status: 'present'
+    res.json({
+      success: true,
+      data: attendance
     });
-
-    const summary = {
-      totalDays,
-      presentDays,
-      absentDays: totalDays - presentDays,
-      attendanceRate: totalDays > 0 ? ((presentDays / totalDays) * 100).toFixed(1) : 0
-    };
-
-    res.json(summary);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('Error fetching attendance record:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch attendance record',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Update attendance record
+// @route   PUT /api/attendance/:id
+// @access  Private/Staff
+export const updateAttendance = async (req, res) => {
+  try {
+    let attendance = await Attendance.findById(req.params.id);
+
+    if (!attendance) {
+      return res.status(404).json({
+        success: false,
+        message: 'Attendance record not found'
+      });
+    }
+
+    // Make sure user is attendance creator
+    if (attendance.createdBy.toString() !== req.user._id.toString()) {
+      return res.status(401).json({
+        success: false,
+        message: 'Not authorized to update this attendance record'
+      });
+    }
+
+    // If date or class is being updated, check for duplicates
+    if (req.body.date || req.body.class) {
+      const existingAttendance = await Attendance.findOne({
+        _id: { $ne: req.params.id },
+        class: req.body.class || attendance.class,
+        date: req.body.date ? new Date(req.body.date) : attendance.date
+      });
+
+      if (existingAttendance) {
+        return res.status(400).json({
+          success: false,
+          message: 'Attendance for this class and date already exists'
+        });
+      }
+    }
+
+    attendance = await Attendance.findByIdAndUpdate(
+      req.params.id,
+      {
+        ...req.body,
+        date: req.body.date ? new Date(req.body.date) : attendance.date
+      },
+      {
+        new: true,
+        runValidators: true
+      }
+    ).populate([
+      {
+        path: 'students.student',
+        select: 'name admissionNumber'
+      },
+      {
+        path: 'createdBy',
+        select: 'name'
+      }
+    ]);
+
+    res.json({
+      success: true,
+      data: attendance
+    });
+  } catch (error) {
+    console.error('Error updating attendance record:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update attendance record',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Delete attendance record
+// @route   DELETE /api/attendance/:id
+// @access  Private/Staff
+export const deleteAttendance = async (req, res) => {
+  try {
+    const attendance = await Attendance.findById(req.params.id);
+
+    if (!attendance) {
+      return res.status(404).json({
+        success: false,
+        message: 'Attendance record not found'
+      });
+    }
+
+    // Make sure user is attendance creator
+    if (attendance.createdBy.toString() !== req.user._id.toString()) {
+      return res.status(401).json({
+        success: false,
+        message: 'Not authorized to delete this attendance record'
+      });
+    }
+
+    await attendance.deleteOne();
+
+    res.json({
+      success: true,
+      data: {}
+    });
+  } catch (error) {
+    console.error('Error deleting attendance record:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete attendance record',
+      error: error.message
+    });
   }
 };

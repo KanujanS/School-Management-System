@@ -1,26 +1,27 @@
 import express from 'express';
-import { 
+import { protect } from '../middleware/authMiddleware.js';
+import {
   createAssignment,
   getAssignments,
-  getAssignment,
+  getAssignmentById,
   updateAssignment,
-  deleteAssignment
+  deleteAssignment,
+  downloadAssignment
 } from '../controllers/assignmentController.js';
-import { protect, authorize } from '../middleware/auth.js';
 
 const router = express.Router();
 
-router.use(protect); // Protect all routes
+// Place the download route before the :id routes to prevent conflicts
+router.get('/download/:filename', protect, downloadAssignment);
 
-router
-  .route('/')
-  .post(authorize('staff', 'admin'), createAssignment)
-  .get(getAssignments);
+// Assignment routes
+router.route('/')
+  .get(protect, getAssignments)
+  .post(protect, createAssignment);
 
-router
-  .route('/:id')
-  .get(getAssignment)
-  .put(authorize('staff', 'admin'), updateAssignment)
-  .delete(authorize('staff', 'admin'), deleteAssignment);
+router.route('/:id')
+  .get(protect, getAssignmentById)
+  .put(protect, updateAssignment)
+  .delete(protect, deleteAssignment);
 
 export default router; 

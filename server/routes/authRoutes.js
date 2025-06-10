@@ -1,20 +1,41 @@
 import express from 'express';
-import { register, login, getMe, getAllStaff, removeStaff, updateStaffStatus, getDashboardStats } from '../controllers/authController.js';
-import { protect, authorize } from '../middleware/authMiddleware.js';
+import { protect, admin } from '../middleware/authMiddleware.js';
+import {
+  login,
+  register,
+  createStaff,
+  getAllStaff,
+  getDashboardStats,
+  getMe,
+  updateStaff,
+  removeStaff
+} from '../controllers/authController.js';
 
 const router = express.Router();
 
 // Public routes
-router.post('/register', register);
 router.post('/login', login);
+router.post('/register', register);
 
 // Protected routes
-router.get('/me', protect, getMe);
+router.use(protect);
+
+// Get current user
+router.get('/me', getMe);
 
 // Admin only routes
-router.get('/dashboard-stats', protect, authorize('admin'), getDashboardStats);
-router.get('/staff', protect, authorize('admin'), getAllStaff);
-router.delete('/staff/:id', protect, authorize('admin'), removeStaff);
-router.patch('/staff/:id/status', protect, authorize('admin'), updateStaffStatus);
+router.use(admin);
+
+// Staff management routes
+router.route('/staff')
+  .get(getAllStaff)
+  .post(createStaff);
+
+router.route('/staff/:id')
+  .put(updateStaff)
+  .delete(removeStaff);
+
+// Dashboard stats
+router.get('/dashboard-stats', getDashboardStats);
 
 export default router; 

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Box, Grid, Typography, Card, CardContent, CircularProgress, Alert } from '@mui/material';
 import { useAuth } from '../../context/AuthContext';
 import { assignmentsAPI, marksAPI, attendanceAPI } from '../../services/api';
 import {
@@ -17,41 +18,52 @@ const StaffDashboard = () => {
   const [showAddAssignmentModal, setShowAddAssignmentModal] = useState(false);
   const [showAddMarksModal, setShowAddMarksModal] = useState(false);
   const [showAddAttendanceModal, setShowAddAttendanceModal] = useState(false);
-  const [recentAssignments, setRecentAssignments] = useState([]);
-  const [recentMarks, setRecentMarks] = useState([]);
-  const [recentAttendance, setRecentAttendance] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [dashboardData, setDashboardData] = useState({
+    recentAssignments: [],
+    recentMarks: [],
+    recentAttendance: []
+  });
 
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        setIsLoading(true);
-        const [assignments, marks, attendance] = await Promise.all([
-          assignmentsAPI.getAll({ limit: 5 }),
-          marksAPI.getAll({ limit: 5 }),
-          attendanceAPI.getAll({ limit: 5 })
+        setLoading(true);
+        setError(null);
+
+        // Fetch data in parallel
+        const [assignmentsRes, marksRes, attendanceRes] = await Promise.all([
+          assignmentsAPI.getAll({ limit: 5, staffId: user._id }),
+          marksAPI.getAll({ limit: 5, staffId: user._id }),
+          attendanceAPI.getAll({ limit: 5, staffId: user._id })
         ]);
 
-        setRecentAssignments(assignments);
-        setRecentMarks(marks);
-        setRecentAttendance(attendance);
-      } catch (error) {
-        console.error('Error fetching dashboard data:', error);
-        toast.error('Failed to load dashboard data');
+        setDashboardData({
+          recentAssignments: assignmentsRes.assignments || [],
+          recentMarks: marksRes.marks || [],
+          recentAttendance: attendanceRes.attendance || []
+        });
+      } catch (err) {
+        console.error('Error fetching dashboard data:', err);
+        setError('Failed to load dashboard data. Please try again later.');
       } finally {
-        setIsLoading(false);
+        setLoading(false);
       }
     };
 
-    if (user) {
+    if (user?._id) {
       fetchDashboardData();
     }
-  }, [user]);
+  }, [user?._id]);
 
   const handleAddAssignment = async (newAssignment) => {
     try {
       const response = await assignmentsAPI.create(newAssignment);
-      setRecentAssignments(prev => [response, ...prev.slice(0, 4)]);
+      setDashboardData(prev => ({
+        ...prev,
+        recentAssignments: [response, ...prev.recentAssignments.slice(0, 4)]
+      }));
       setShowAddAssignmentModal(false);
       toast.success('Assignment added successfully');
     } catch (error) {
@@ -63,7 +75,10 @@ const StaffDashboard = () => {
   const handleAddMarks = async (newMark) => {
     try {
       const response = await marksAPI.create(newMark);
-      setRecentMarks(prev => [response, ...prev.slice(0, 4)]);
+      setDashboardData(prev => ({
+        ...prev,
+        recentMarks: [response, ...prev.recentMarks.slice(0, 4)]
+      }));
       setShowAddMarksModal(false);
       toast.success('Marks added successfully');
     } catch (error) {
@@ -75,7 +90,10 @@ const StaffDashboard = () => {
   const handleAddAttendance = async (attendanceData) => {
     try {
       const response = await attendanceAPI.create(attendanceData);
-      setRecentAttendance(prev => [response, ...prev.slice(0, 4)]);
+      setDashboardData(prev => ({
+        ...prev,
+        recentAttendance: [response, ...prev.recentAttendance.slice(0, 4)]
+      }));
       setShowAddAttendanceModal(false);
       toast.success('Attendance recorded successfully');
     } catch (error) {
@@ -84,31 +102,106 @@ const StaffDashboard = () => {
     }
   };
 
-  // If user is not loaded yet or data is loading, show loading state
-  if (isLoading || !user) {
+  if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-800 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
-        </div>
-      </div>
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="80vh">
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box p={3}>
+        <Alert severity="error">{error}</Alert>
+      </Box>
     );
   }
 
   return (
-    <div className="p-6 space-y-8">
-      {/* Header with Image Slider */}
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        <ImageSlider />
-        <div className="p-6">
-          <h1 className="text-3xl font-bold text-gray-900">Welcome, {user.name}</h1>
-          <p className="mt-2 text-gray-600">Manage your teaching activities</p>
-        </div>
-      </div>
+    <Box p={3}>
+      <Typography variant="h4" gutterBottom>
+        Welcome, {user?.name}
+      </Typography>
+
+      <Grid container spacing={3}>
+        {/* Recent Assignments */}
+        <Grid item xs={12} md={4}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                Recent Assignments
+              </Typography>
+              {dashboardData.recentAssignments.length === 0 ? (
+                <Typography color="textSecondary">No recent assignments</Typography>
+              ) : (
+                dashboardData.recentAssignments.map((assignment) => (
+                  <Box key={assignment._id} mb={2}>
+                    <Typography variant="subtitle1">{assignment.title}</Typography>
+                    <Typography variant="body2" color="textSecondary">
+                      {assignment.subject} - Due: {new Date(assignment.dueDate).toLocaleDateString()}
+                    </Typography>
+                  </Box>
+                ))
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Recent Marks */}
+        <Grid item xs={12} md={4}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                Recent Marks
+              </Typography>
+              {dashboardData.recentMarks.length === 0 ? (
+                <Typography color="textSecondary">No recent marks</Typography>
+              ) : (
+                dashboardData.recentMarks.map((mark) => (
+                  <Box key={mark._id} mb={2}>
+                    <Typography variant="subtitle1">
+                      {mark.student?.name || 'Unknown Student'}
+                    </Typography>
+                    <Typography variant="body2" color="textSecondary">
+                      {mark.subject} - Score: {mark.score}/{mark.totalMarks}
+                    </Typography>
+                  </Box>
+                ))
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Recent Attendance */}
+        <Grid item xs={12} md={4}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                Recent Attendance
+              </Typography>
+              {dashboardData.recentAttendance.length === 0 ? (
+                <Typography color="textSecondary">No recent attendance records</Typography>
+              ) : (
+                dashboardData.recentAttendance.map((record) => (
+                  <Box key={record._id} mb={2}>
+                    <Typography variant="subtitle1">{record.class}</Typography>
+                    <Typography variant="body2" color="textSecondary">
+                      {record.subject} - {new Date(record.date).toLocaleDateString()}
+                    </Typography>
+                    <Typography variant="body2" color="textSecondary">
+                      Present: {record.students.filter(s => s.status === 'present').length}
+                    </Typography>
+                  </Box>
+                ))
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
         <button
           onClick={() => setShowAddAssignmentModal(true)}
           className="p-6 bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow"
@@ -137,52 +230,6 @@ const StaffDashboard = () => {
         </button>
       </div>
 
-      {/* Recent Activity */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Recent Assignments */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Assignments</h3>
-          <div className="space-y-4">
-            {recentAssignments.map((assignment) => (
-              <div key={assignment._id} className="border-b pb-2">
-                <p className="font-medium text-gray-900">{assignment.title}</p>
-                <p className="text-sm text-gray-600">Due: {new Date(assignment.dueDate).toLocaleDateString()}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Recent Marks */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Marks</h3>
-          <div className="space-y-4">
-            {recentMarks.map((mark) => (
-              <div key={mark._id} className="border-b pb-2">
-                <p className="font-medium text-gray-900">{mark.studentName}</p>
-                <p className="text-sm text-gray-600">
-                  {mark.subject}: {mark.value}/{mark.totalMarks}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Recent Attendance */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Attendance</h3>
-          <div className="space-y-4">
-            {recentAttendance.map((record) => (
-              <div key={record._id} className="border-b pb-2">
-                <p className="font-medium text-gray-900">{record.class}</p>
-                <p className="text-sm text-gray-600">
-                  Date: {new Date(record.date).toLocaleDateString()}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
       {/* Modals */}
       {showAddAssignmentModal && (
         <AddAssignment
@@ -205,7 +252,7 @@ const StaffDashboard = () => {
           selectedDate={new Date().toISOString().split('T')[0]}
         />
       )}
-    </div>
+    </Box>
   );
 };
 

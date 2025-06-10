@@ -4,38 +4,40 @@ const markSchema = new mongoose.Schema({
   student: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: [true, 'Student ID is required']
+    required: [true, 'Please add a student']
   },
   subject: {
     type: String,
-    required: [true, 'Subject is required'],
-    trim: true,
-    uppercase: true
+    required: [true, 'Please add a subject'],
+    trim: true
   },
-  class: {
-    type: String,
-    required: [true, 'Class is required'],
-    trim: true,
-    uppercase: true
-  },
-  term: {
-    type: String,
-    required: [true, 'Term is required'],
-    enum: {
-      values: ['FIRST', 'SECOND', 'THIRD'],
-      message: '{VALUE} is not a valid term'
-    },
-    uppercase: true
-  },
-  marks: {
+  score: {
     type: Number,
-    required: [true, 'Marks are required'],
-    min: [0, 'Marks cannot be negative'],
-    max: [100, 'Marks cannot exceed 100']
+    required: [true, 'Please add a score'],
+    min: [0, 'Score cannot be negative'],
+    max: [100, 'Score cannot exceed 100']
+  },
+  totalMarks: {
+    type: Number,
+    required: [true, 'Please add total marks'],
+    min: [0, 'Total marks cannot be negative'],
+    default: 100
+  },
+  examType: {
+    type: String,
+    required: [true, 'Please add exam type'],
+    enum: ['Term 1', 'Term 2', 'Term 3'],
+    trim: true
   },
   grade: {
     type: String,
-    uppercase: true
+    enum: ['A', 'B', 'C', 'S', 'F', ''],
+    default: ''
+  },
+  class: {
+    type: String,
+    required: [true, 'Please add class'],
+    trim: true
   },
   remarks: {
     type: String,
@@ -44,7 +46,7 @@ const markSchema = new mongoose.Schema({
   markedBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: [true, 'Teacher ID is required']
+    required: true
   }
 }, {
   timestamps: true
@@ -52,24 +54,29 @@ const markSchema = new mongoose.Schema({
 
 // Create compound index to prevent duplicate marks entries
 markSchema.index(
-  { student: 1, subject: 1, term: 1 },
+  { student: 1, subject: 1, examType: 1 },
   { unique: true }
 );
 
 // Calculate grade before saving
 markSchema.pre('save', function(next) {
-  this.grade = calculateGrade(this.marks);
+  const score = this.score;
+  if (score >= 75) this.grade = 'A';
+  else if (score >= 65) this.grade = 'B';
+  else if (score >= 55) this.grade = 'C';
+  else if (score >= 35) this.grade = 'S';
+  else this.grade = 'F';
   next();
 });
 
-// Grade calculation function
-function calculateGrade(marks) {
-  if (marks >= 75) return 'A';
-  if (marks >= 65) return 'B';
-  if (marks >= 55) return 'C';
-  if (marks >= 35) return 'S';
-  return 'F';
-}
+// Normalize class name before saving
+markSchema.pre('save', function(next) {
+  if (this.class) {
+    // Replace multiple spaces with a single hyphen
+    this.class = this.class.replace(/\s+/g, '-');
+  }
+  next();
+});
 
 const Mark = mongoose.model('Mark', markSchema);
 

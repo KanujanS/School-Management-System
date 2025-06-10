@@ -1,30 +1,128 @@
 import React, { useState, useEffect } from 'react';
-import { XMarkIcon } from '@heroicons/react/24/outline';
-import { studentsAPI } from '../services/api';
+import { 
+  Box, 
+  Button, 
+  FormControl, 
+  InputLabel, 
+  MenuItem, 
+  Select, 
+  TextField, 
+  Typography, 
+  Grid, 
+  Checkbox, 
+  Paper, 
+  IconButton,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  InputAdornment
+} from '@mui/material';
+import { Close as CloseIcon, Search as SearchIcon } from '@mui/icons-material';
+import { attendanceAPI, userAPI } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 
-const AddAttendance = ({ onClose, onAdd, selectedDate }) => {
+const AddAttendance = ({ onClose, onSuccess }) => {
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     class: '',
-    date: selectedDate || new Date().toISOString().split('T')[0],
+    date: new Date().toISOString().split('T')[0],
     students: []
   });
-  const [isLoading, setIsLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [students, setStudents] = useState([]);
+  const [loadingStudents, setLoadingStudents] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
-  // Predefined list of all classes
+  // All available classes
   const allClasses = [
     // O/L Classes (Grade 6-11)
-    ...[6, 7, 8, 9, 10, 11].flatMap(grade => 
-      ['A', 'B', 'C', 'D', 'E', 'F'].map(division => `Grade ${grade}-${division}`)
+    ...[6, 7, 8, 9, 10, 11].flatMap((grade) =>
+      ["A", "B", "C", "D", "E", "F"].map((division) => `${grade}${division}`)
     ),
     // A/L Classes with detailed streams
-    'A/L Physical Science',
-    'A/L Biological Science',
-    'A/L Bio Technology',
-    'A/L Engineering Technology',
-    'A/L Commerce',
-    'A/L Arts'
+    "AL-Physical Science",
+    "AL-Biological Science",
+    "AL-Engineering Technology",
+    "AL-Bio Technology",
+    "AL-Commerce",
+    "AL-Arts",
   ];
+
+  useEffect(() => {
+    if (formData.class) {
+      fetchStudentsByClass(formData.class);
+    }
+  }, [formData.class]);
+
+  const fetchStudentsByClass = async (className) => {
+    try {
+      setLoadingStudents(true);
+      const data = await userAPI.getStudentsByClass(className);
+      if (data.success) {
+        setStudents(data.data || []);
+        // Initialize attendance status for all students as absent
+        setFormData(prev => ({
+          ...prev,
+          students: data.data.map(student => ({
+            student: student._id,
+            status: 'absent'
+          }))
+        }));
+      } else {
+        throw new Error(data.message || 'Failed to fetch students');
+      }
+    } catch (error) {
+      console.error('Error fetching students:', error);
+      toast.error('Failed to fetch students');
+      setStudents([]);
+    } finally {
+      setLoadingStudents(false);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!formData.class || !formData.date || formData.students.length === 0) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    // Log the data being sent
+    console.log('Submitting attendance data:', {
+      class: formData.class,
+      date: formData.date,
+      students: formData.students
+    });
+
+    try {
+      setLoading(true);
+      const response = await attendanceAPI.create({
+        class: formData.class,
+        date: formData.date,
+        students: formData.students.map(student => ({
+          student: student.student,
+          status: student.status
+        }))
+      });
+      console.log('Server response:', response);
+      toast.success('Attendance recorded successfully');
+      onSuccess();
+    } catch (error) {
+      console.error('Error recording attendance:', error);
+      // Log more detailed error information
+      if (error.response) {
+        console.error('Server error details:', error.response.data);
+      }
+      toast.error(error.response?.data?.message || 'Failed to record attendance');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -34,143 +132,196 @@ const AddAttendance = ({ onClose, onAdd, selectedDate }) => {
     }));
   };
 
-  const handleAttendanceChange = (studentId, status) => {
-    setFormData(prev => ({
-      ...prev,
-      students: prev.students.map(student =>
-        student._id === studentId
-          ? { ...student, status }
-          : student
-      )
-    }));
+  const handleStudentStatusChange = (studentId, status) => {
+    setFormData(prev => {
+      const updatedStudents = prev.students.map(s => 
+        s.student === studentId ? { ...s, status: status ? 'present' : 'absent' } : s
+      );
+      return { ...prev, students: updatedStudents };
+    });
   };
 
-  const handleClassChange = async (selectedClass) => {
-    try {
-      setIsLoading(true);
-      const students = await studentsAPI.getByClass(selectedClass);
-      setFormData(prev => ({
-        ...prev,
-        class: selectedClass,
-        students: students.map(student => ({
-          _id: student._id,
-          name: student.name,
-          status: 'present' // Default status
-        }))
-      }));
-    } catch (error) {
-      console.error('Error fetching students:', error);
-      toast.error('Failed to load students for the selected class');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const filteredStudents = students.filter(student => 
+    student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    student.admissionNumber.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    onAdd(formData);
-  };
+  const presentCount = formData.students.filter(s => s.status === 'present').length;
+  const absentCount = formData.students.filter(s => s.status === 'absent').length;
 
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full">
-      <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-medium">Add Attendance</h3>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-500"
-          >
-            <XMarkIcon className="h-6 w-6" />
-          </button>
-        </div>
+    <Box component="form" onSubmit={handleSubmit} sx={{ height: '100%' }}>
+      {/* Header */}
+      <Box sx={{ 
+        p: 2, 
+        borderBottom: '1px solid #e0e0e0',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+      }}>
+        <Typography variant="h6">Record Attendance</Typography>
+        <IconButton onClick={onClose} size="small">
+          <CloseIcon />
+        </IconButton>
+      </Box>
 
-        <form onSubmit={handleSubmit}>
-          <div className="mb-4">
-            <label className="block text-gray-700 text-sm font-bold mb-2">
-              Class
-            </label>
-            <select
-              name="class"
-              value={formData.class}
-              onChange={(e) => handleClassChange(e.target.value)}
-              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-              required
-            >
-              <option value="">Select Class</option>
-              {allClasses.map((className) => (
-                <option key={className} value={className}>
-                  {className}
-                </option>
-              ))}
-            </select>
-          </div>
+      {/* Content */}
+      <Box sx={{ p: 3, height: 'calc(100% - 64px)', display: 'flex', flexDirection: 'column' }}>
+        {/* Controls */}
+        <Grid container spacing={3} sx={{ mb: 3 }}>
+          <Grid item xs={12} md={4}>
+            <FormControl fullWidth required>
+              <InputLabel>Class</InputLabel>
+              <Select
+                name="class"
+                value={formData.class}
+                onChange={handleChange}
+                label="Class"
+                MenuProps={{
+                  PaperProps: {
+                    sx: {
+                      maxHeight: 400,
+                      '& .MuiMenuItem-root': {
+                        padding: '12px 24px',
+                        minWidth: '250px'
+                      }
+                    }
+                  }
+                }}
+                sx={{
+                  '& .MuiSelect-select': {
+                    padding: '12px 24px',
+                    minWidth: '250px'
+                  }
+                }}
+              >
+                {allClasses.map((className) => (
+                  <MenuItem key={className} value={className}>
+                    {className}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
 
-          <div className="mb-4">
-            <label className="block text-gray-700 text-sm font-bold mb-2">
-              Date
-            </label>
-            <input
+          <Grid item xs={12} md={4}>
+            <TextField
+              fullWidth
               type="date"
               name="date"
+              label="Date"
               value={formData.date}
               onChange={handleChange}
-              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              InputLabelProps={{ shrink: true }}
               required
             />
-          </div>
+          </Grid>
 
-          {isLoading ? (
-            <div className="text-center py-4">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-800 mx-auto"></div>
-              <p className="mt-2 text-gray-600">Loading students...</p>
-            </div>
-          ) : formData.students.length > 0 ? (
-            <div className="mb-4">
-              <label className="block text-gray-700 text-sm font-bold mb-2">
-                Students
-              </label>
-              <div className="max-h-60 overflow-y-auto">
-                {formData.students.map((student) => (
-                  <div
+          <Grid item xs={12} md={4}>
+            <TextField
+              fullWidth
+              label="Search Students"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon />
+                  </InputAdornment>
+                )
+              }}
+            />
+          </Grid>
+        </Grid>
+
+        {/* Summary */}
+        <Box sx={{ mb: 3, display: 'flex', gap: 2 }}>
+          <Paper sx={{ p: 2, flex: 1, bgcolor: '#f0fdf4' }}>
+            <Typography variant="h6" color="success.main">Present: {presentCount}</Typography>
+            <Typography variant="body2" color="text.secondary">
+              {students.length > 0 ? `${((presentCount / students.length) * 100).toFixed(1)}% of class` : 'No students'}
+            </Typography>
+          </Paper>
+          <Paper sx={{ p: 2, flex: 1, bgcolor: '#fef2f2' }}>
+            <Typography variant="h6" color="error.main">Absent: {absentCount}</Typography>
+            <Typography variant="body2" color="text.secondary">
+              {students.length > 0 ? `${((absentCount / students.length) * 100).toFixed(1)}% of class` : 'No students'}
+            </Typography>
+          </Paper>
+        </Box>
+
+        {/* Students Table */}
+        <TableContainer component={Paper} sx={{ flex: 1, overflow: 'auto' }}>
+          {loadingStudents ? (
+            <Box sx={{ p: 2, textAlign: 'center' }}>
+              <Typography>Loading students...</Typography>
+            </Box>
+          ) : students.length === 0 ? (
+            <Box sx={{ p: 2, textAlign: 'center' }}>
+              <Typography color="text.secondary">
+                {formData.class ? 'No students found in this class' : 'Select a class to view students'}
+              </Typography>
+            </Box>
+          ) : (
+            <Table stickyHeader>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Name</TableCell>
+                  <TableCell>Index Number</TableCell>
+                  <TableCell align="center">Attendance Status</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {filteredStudents.map((student) => (
+                  <TableRow 
                     key={student._id}
-                    className="flex items-center justify-between p-2 border-b"
+                    sx={{ 
+                      '&:last-child td, &:last-child th': { border: 0 },
+                      bgcolor: formData.students.find(s => s.student === student._id)?.status === 'present' 
+                        ? '#f0fdf4' 
+                        : 'inherit'
+                    }}
                   >
-                    <span>{student.name}</span>
-                    <select
-                      value={student.status}
-                      onChange={(e) =>
-                        handleAttendanceChange(student._id, e.target.value)
-                      }
-                      className="ml-2 border rounded py-1 px-2"
-                    >
-                      <option value="present">Present</option>
-                      <option value="absent">Absent</option>
-                    </select>
-                  </div>
+                    <TableCell>{student.name}</TableCell>
+                    <TableCell>{student.admissionNumber}</TableCell>
+                    <TableCell align="center">
+                      <Checkbox
+                        checked={formData.students.find(s => s.student === student._id)?.status === 'present'}
+                        onChange={(e) => handleStudentStatusChange(student._id, e.target.checked)}
+                        color="success"
+                      />
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </div>
-            </div>
-          ) : null}
+              </TableBody>
+            </Table>
+          )}
+        </TableContainer>
 
-          <div className="flex items-center justify-end">
-            <button
-              type="button"
-              onClick={onClose}
-              className="mr-2 px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-500"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 text-sm font-medium text-white bg-red-900 rounded-md hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-              disabled={!formData.class || formData.students.length === 0}
-            >
-              Save
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        {/* Footer */}
+        <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end', gap: 2, borderTop: '1px solid #e0e0e0', pt: 3 }}>
+          <Button onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            variant="contained"
+            disabled={loading || loadingStudents || students.length === 0}
+            sx={{
+              bgcolor: '#7f1d1d',
+              '&:hover': {
+                bgcolor: '#991b1b',
+              },
+              '&:disabled': {
+                bgcolor: '#e5e7eb',
+              }
+            }}
+          >
+            {loading ? 'Recording...' : 'Record Attendance'}
+          </Button>
+        </Box>
+      </Box>
+    </Box>
   );
 };
 

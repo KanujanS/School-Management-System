@@ -1,338 +1,227 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../../context/AuthContext';
+import { 
+  Box, 
+  Button, 
+  Typography, 
+  Paper, 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableContainer, 
+  TableHead, 
+  TableRow, 
+  Dialog, 
+  IconButton, 
+  Chip,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle
+} from '@mui/material';
+import { Add as AddIcon, Delete as DeleteIcon } from '@mui/icons-material';
 import { attendanceAPI } from '../../services/api';
-import { PlusIcon, CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline';
+import { useAuth } from '../../context/AuthContext';
 import AddAttendance from '../../components/AddAttendance';
 import toast from 'react-hot-toast';
 
 const Attendance = () => {
   const { user } = useAuth();
-  const [studentData, setStudentData] = useState(null);
-  const [attendanceData, setAttendanceData] = useState([]);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-  const [selectedClass, setSelectedClass] = useState('all');
+  const [attendanceRecords, setAttendanceRecords] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  // Predefined list of all classes
-  const allClasses = [
-    // O/L Classes (Grade 6-11)
-    ...[6, 7, 8, 9, 10, 11].flatMap(grade => 
-      ['A', 'B', 'C', 'D', 'E', 'F'].map(division => `Grade ${grade}-${division}`)
-    ),
-    // A/L Classes with detailed streams
-    'A/L Physical Science',
-    'A/L Biological Science',
-    'A/L Bio Technology',
-    'A/L Engineering Technology',
-    'A/L Commerce',
-    'A/L Arts'
-  ];
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [selectedRecord, setSelectedRecord] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-        
-        // Fetch student's personal data if user is a student
-        if (user?.role === 'student') {
-          const studentDetails = await attendanceAPI.getStudentDetails(user._id);
-          setStudentData(studentDetails);
-        }
+    fetchAttendanceRecords();
+  }, []);
 
-        // Fetch attendance data
-        const data = await attendanceAPI.getAll({
-          userId: user?._id,
-          role: user?.role,
-          date: selectedDate,
-          class: selectedClass !== 'all' ? selectedClass : undefined
-        });
-        
-        setAttendanceData(Array.isArray(data) ? data : []);
-      } catch (error) {
-        console.error('Error fetching data:', error);
-        setError(error.message);
-        toast.error('Failed to load attendance data');
-        setAttendanceData([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    if (user) {
-      fetchData();
-    }
-  }, [user, selectedDate, selectedClass]);
-
-  // Calculate attendance summary for student
-  const calculateAttendanceSummary = () => {
-    if (!Array.isArray(attendanceData)) {
-      return {
-        totalDays: 0,
-        presentDays: 0,
-        absentDays: 0,
-        presentPercentage: 0
-      };
-    }
-
-    const totalDays = attendanceData.length;
-    const presentDays = attendanceData.filter(record => record?.status === 'present').length;
-    const absentDays = totalDays - presentDays;
-    const presentPercentage = totalDays > 0 ? ((presentDays / totalDays) * 100).toFixed(1) : 0;
-
-    return {
-      totalDays,
-      presentDays,
-      absentDays,
-      presentPercentage
-    };
-  };
-
-  // Handle adding new attendance record
-  const handleAddAttendance = async (newAttendance) => {
+  const fetchAttendanceRecords = async () => {
     try {
-      const response = await attendanceAPI.create(newAttendance);
-      const newData = Array.isArray(response.data) ? response.data : [response.data];
-      setAttendanceData(prevData => [...prevData, ...newData]);
-      setShowAddModal(false);
-      toast.success('Attendance records added successfully');
+      setLoading(true);
+      const response = await attendanceAPI.getAll();
+      if (response.success) {
+        setAttendanceRecords(response.data || []);
+      } else {
+        throw new Error(response.message || 'Failed to fetch attendance records');
+      }
     } catch (error) {
-      console.error('Error adding attendance:', error);
-      toast.error('Failed to add attendance records');
+      console.error('Error fetching attendance records:', error);
+      toast.error('Failed to load attendance records');
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Filter attendance based on selected date and class
-  const filteredAttendance = Array.isArray(attendanceData) 
-    ? attendanceData.filter(record => {
-        if (!record) return false;
-        const dateMatch = record.date === selectedDate;
-        const classMatch = selectedClass === 'all' || record.class === selectedClass;
-        return dateMatch && classMatch;
-      })
-    : [];
+  const handleAddSuccess = () => {
+    fetchAttendanceRecords();
+    setShowAddModal(false);
+  };
 
-  // If loading or user not loaded yet, show loading state
-  if (isLoading || !user) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-800 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading attendance records...</p>
-        </div>
-      </div>
-    );
-  }
+  const handleDeleteClick = (record) => {
+    setSelectedRecord(record);
+    setDeleteDialogOpen(true);
+  };
 
-  // If there's an error, show error state
-  if (error) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="text-red-800 text-xl mb-4">⚠️</div>
-          <p className="text-gray-600">Error loading attendance records: {error}</p>
-          <button 
-            onClick={() => window.location.reload()}
-            className="mt-4 px-4 py-2 bg-red-800 text-white rounded hover:bg-red-700"
-          >
-            Try Again
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const handleDeleteConfirm = async () => {
+    try {
+      setDeleting(true);
+      const response = await attendanceAPI.delete(selectedRecord._id);
+      if (response.success) {
+        // Remove the deleted record from the state
+        setAttendanceRecords(prev => prev.filter(record => record._id !== selectedRecord._id));
+        toast.success('Attendance record deleted successfully');
+      } else {
+        throw new Error(response.message || 'Failed to delete attendance record');
+      }
+    } catch (error) {
+      console.error('Error deleting attendance record:', error);
+      toast.error(error.message || 'Failed to delete attendance record');
+    } finally {
+      setDeleting(false);
+      setDeleteDialogOpen(false);
+      setSelectedRecord(null);
+    }
+  };
 
-  const attendanceSummary = calculateAttendanceSummary();
+  const handleDeleteCancel = () => {
+    setDeleteDialogOpen(false);
+    setSelectedRecord(null);
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'present':
+        return 'success';
+      case 'absent':
+        return 'error';
+      case 'late':
+        return 'warning';
+      default:
+        return 'default';
+    }
+  };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Attendance Records</h1>
-            {user?.role === 'student' ? (
-              <p className="mt-1 text-sm text-gray-500">
-                View your attendance records for {studentData?.class || 'your class'}
-              </p>
-            ) : (
-              <p className="mt-1 text-sm text-gray-500">
-                View and manage student attendance
-              </p>
-            )}
-          </div>
-          {(user?.role === 'staff' || user?.role === 'admin') && (
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-900 hover:bg-red-800"
-            >
-              <PlusIcon className="h-5 w-5 mr-2" />
-              Mark Attendance
-            </button>
-          )}
-        </div>
-      </div>
+    <Box p={3}>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+        <Typography variant="h5">Attendance Records</Typography>
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          onClick={() => setShowAddModal(true)}
+          sx={{
+            backgroundColor: '#7f1d1d',
+            '&:hover': {
+              backgroundColor: '#991b1b',
+            },
+          }}
+        >
+          Record Attendance
+        </Button>
+      </Box>
 
-      {/* Student Attendance Summary */}
-      {user?.role === 'student' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <div className="flex items-center space-x-2">
-              <CheckCircleIcon className="h-6 w-6 text-green-600" />
-              <h3 className="text-lg font-semibold text-gray-900">Present Days</h3>
-            </div>
-            <div className="mt-2">
-              <p className="text-3xl font-bold text-green-600">{attendanceSummary.presentDays}</p>
-              <p className="text-sm text-gray-500">
-                {attendanceSummary.presentPercentage}% Attendance Rate
-              </p>
-            </div>
-          </div>
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <div className="flex items-center space-x-2">
-              <XCircleIcon className="h-6 w-6 text-red-600" />
-              <h3 className="text-lg font-semibold text-gray-900">Absent Days</h3>
-            </div>
-            <div className="mt-2">
-              <p className="text-3xl font-bold text-red-600">{attendanceSummary.absentDays}</p>
-              <p className="text-sm text-gray-500">
-                Out of {attendanceSummary.totalDays} total days
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
+      {loading ? (
+        <Box display="flex" justifyContent="center" p={3}>
+          <Typography>Loading attendance records...</Typography>
+        </Box>
+      ) : attendanceRecords.length === 0 ? (
+        <Paper sx={{ p: 3, textAlign: 'center' }}>
+          <Typography color="textSecondary">No attendance records found</Typography>
+        </Paper>
+      ) : (
+        <TableContainer component={Paper}>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>Date</TableCell>
+                <TableCell>Class</TableCell>
+                <TableCell>Present</TableCell>
+                <TableCell>Absent</TableCell>
+                <TableCell align="center">Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {attendanceRecords.map((record) => {
+                const presentCount = record.students.filter(s => s.status === 'present').length;
+                const absentCount = record.students.filter(s => s.status === 'absent').length;
 
-      {/* Filters */}
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Date Filter */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Select Date</label>
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-900 focus:ring-red-900 sm:text-sm"
-            />
-          </div>
-
-          {/* Class Filter - Only for staff/admin */}
-          {(user?.role === 'staff' || user?.role === 'admin') && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Select Class</label>
-              <select
-                value={selectedClass}
-                onChange={(e) => setSelectedClass(e.target.value)}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-900 focus:ring-red-900 sm:text-sm"
-              >
-                <option value="all">All Classes</option>
-                <optgroup label="Ordinary Level">
-                  {allClasses
-                    .filter(className => className.startsWith('Grade'))
-                    .map(className => (
-                      <option key={className} value={className}>{className}</option>
-                    ))}
-                </optgroup>
-                <optgroup label="Advanced Level">
-                  {allClasses
-                    .filter(className => className.startsWith('A/L'))
-                    .map(className => (
-                      <option key={className} value={className}>{className}</option>
-                    ))}
-                </optgroup>
-              </select>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Attendance Table */}
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                {user?.role !== 'student' && (
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Student Details
-                  </th>
-                )}
-                {user?.role !== 'student' && (
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Class
-                  </th>
-                )}
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Date
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredAttendance.map((record) => (
-                <tr key={record.id}>
-                  {user?.role !== 'student' && (
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">
-                        {record.studentName}
-                      </div>
-                      <div className="text-sm text-gray-500">ID: {record.studentId}</div>
-                    </td>
-                  )}
-                  {user?.role !== 'student' && (
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{record.class}</div>
-                    </td>
-                  )}
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">
-                      {new Date(record.date).toLocaleDateString()}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      record.status === 'present'
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-red-100 text-red-800'
-                    }`}>
-                      {record.status.charAt(0).toUpperCase() + record.status.slice(1)}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Empty State */}
-      {filteredAttendance.length === 0 && (
-        <div className="text-center py-12 bg-white rounded-lg shadow-md">
-          <h3 className="mt-2 text-sm font-medium text-gray-900">
-            No attendance records found
-          </h3>
-          <p className="mt-1 text-sm text-gray-500">
-            {user?.role === 'student' 
-              ? 'No attendance records found for the selected date'
-              : 'Try selecting a different date or class'}
-          </p>
-        </div>
+                return (
+                  <TableRow key={record._id}>
+                    <TableCell>{new Date(record.date).toLocaleDateString()}</TableCell>
+                    <TableCell>{record.class}</TableCell>
+                    <TableCell>
+                      <Chip
+                        label={presentCount}
+                        color="success"
+                        size="small"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={absentCount}
+                        color="error"
+                        size="small"
+                      />
+                    </TableCell>
+                    <TableCell align="center">
+                      <IconButton 
+                        size="small" 
+                        color="error"
+                        onClick={() => handleDeleteClick(record)}
+                        disabled={deleting && selectedRecord?._id === record._id}
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </TableContainer>
       )}
 
       {/* Add Attendance Modal */}
-      {showAddModal && (
+      <Dialog
+        open={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        maxWidth="md"
+        fullWidth
+      >
         <AddAttendance
           onClose={() => setShowAddModal(false)}
-          onAdd={handleAddAttendance}
-          selectedDate={selectedDate}
+          onSuccess={handleAddSuccess}
         />
-      )}
-    </div>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={handleDeleteCancel}
+      >
+        <DialogTitle>Delete Attendance Record</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to delete the attendance record for {selectedRecord?.class} on {selectedRecord ? new Date(selectedRecord.date).toLocaleDateString() : ''}? This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleDeleteCancel} disabled={deleting}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleDeleteConfirm} 
+            color="error" 
+            variant="contained"
+            disabled={deleting}
+          >
+            {deleting ? 'Deleting...' : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
   );
 };
 

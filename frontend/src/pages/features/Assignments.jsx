@@ -4,15 +4,17 @@ import { assignmentsAPI } from '../../services/api';
 import {
   DocumentPlusIcon,
   TrashIcon,
-  FunnelIcon,
+  EyeIcon,
 } from '@heroicons/react/24/outline';
 import AddAssignment from '../../components/AddAssignment';
+import AssignmentDetails from '../../components/AssignmentDetails';
 import toast from 'react-hot-toast';
 
 const Assignments = () => {
   const { user } = useAuth();
   const [assignments, setAssignments] = useState([]);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [selectedAssignment, setSelectedAssignment] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -25,12 +27,16 @@ const Assignments = () => {
       setIsLoading(true);
       setError(null);
       const params = user?.role === 'student' ? { class: user.class } : {};
-      const data = await assignmentsAPI.getAll(params);
-      setAssignments(data || []);
+      const response = await assignmentsAPI.getAll(params);
+      if (response.success) {
+        setAssignments(response.data || []);
+      } else {
+        throw new Error(response.message || 'Failed to fetch assignments');
+      }
     } catch (error) {
       console.error('Error fetching assignments:', error);
-      setError(error.message);
-      toast.error(error.message);
+      setError(error.message || 'Failed to fetch assignments');
+      toast.error(error.message || 'Failed to fetch assignments');
       setAssignments([]);
     } finally {
       setIsLoading(false);
@@ -43,13 +49,17 @@ const Assignments = () => {
 
   const handleAddNewAssignment = async (assignmentData) => {
     try {
-      const newAssignment = await assignmentsAPI.create(assignmentData);
-      setAssignments(prevAssignments => [newAssignment, ...prevAssignments]);
-      setShowAddModal(false);
-      toast.success('Assignment created successfully');
+      const response = await assignmentsAPI.create(assignmentData);
+      if (response.success) {
+        setAssignments(prevAssignments => [response.data, ...prevAssignments]);
+        setShowAddModal(false);
+        toast.success('Assignment created successfully');
+      } else {
+        throw new Error(response.message || 'Failed to create assignment');
+      }
     } catch (error) {
       console.error('Error adding assignment:', error);
-      toast.error(error.message);
+      toast.error(error.message || 'Failed to create assignment');
     }
   };
 
@@ -64,6 +74,10 @@ const Assignments = () => {
         toast.error(error.message);
       }
     }
+  };
+
+  const handleViewDetails = (assignment) => {
+    setSelectedAssignment(assignment);
   };
 
   // Loading state
@@ -140,11 +154,9 @@ const Assignments = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Due Date
                   </th>
-                  {(user?.role === 'staff' || user?.role === 'admin') && (
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  )}
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -176,17 +188,24 @@ const Assignments = () => {
                         {new Date(assignment.dueDate).toLocaleDateString()}
                       </div>
                     </td>
-                    {(user?.role === 'staff' || user?.role === 'admin') && (
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                      <button
+                        onClick={() => handleViewDetails(assignment)}
+                        className="text-red-900 hover:text-red-800 inline-flex items-center"
+                        title="View Details"
+                      >
+                        <EyeIcon className="h-5 w-5" />
+                      </button>
+                      {(user?.role === 'staff' || user?.role === 'admin') && (
                         <button
                           onClick={() => handleDelete(assignment._id)}
-                          className="text-red-900 hover:text-red-800"
+                          className="text-red-900 hover:text-red-800 inline-flex items-center"
                           title="Delete Assignment"
                         >
                           <TrashIcon className="h-5 w-5" />
                         </button>
-                      </td>
-                    )}
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -212,6 +231,14 @@ const Assignments = () => {
         <AddAssignment
           onClose={() => setShowAddModal(false)}
           onAdd={handleAddNewAssignment}
+        />
+      )}
+
+      {/* Assignment Details Modal */}
+      {selectedAssignment && (
+        <AssignmentDetails
+          assignment={selectedAssignment}
+          onClose={() => setSelectedAssignment(null)}
         />
       )}
     </div>
