@@ -21,7 +21,7 @@ import {
   InputAdornment
 } from '@mui/material';
 import { Close as CloseIcon, Search as SearchIcon } from '@mui/icons-material';
-import { attendanceAPI, userAPI } from '../services/api';
+import { attendanceAPI, studentAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 
@@ -41,15 +41,15 @@ const AddAttendance = ({ onClose, onSuccess }) => {
   const allClasses = [
     // O/L Classes (Grade 6-11)
     ...[6, 7, 8, 9, 10, 11].flatMap((grade) =>
-      ["A", "B", "C", "D", "E", "F"].map((division) => `${grade}${division}`)
+      ["A", "B", "C", "D", "E", "F"].map((division) => `Grade-${grade}-${division}`)
     ),
     // A/L Classes with detailed streams
-    "AL-Physical Science",
-    "AL-Biological Science",
-    "AL-Engineering Technology",
-    "AL-Bio Technology",
-    "AL-Commerce",
-    "AL-Arts",
+    "A/L-Physical-Science",
+    "A/L-Biological-Science",
+    "A/L-Engineering-Technology",
+    "A/L-Bio-Technology",
+    "A/L-Commerce",
+    "A/L-Arts"
   ];
 
   useEffect(() => {
@@ -61,24 +61,69 @@ const AddAttendance = ({ onClose, onSuccess }) => {
   const fetchStudentsByClass = async (className) => {
     try {
       setLoadingStudents(true);
-      const data = await userAPI.getStudentsByClass(className);
-      if (data.success) {
-        setStudents(data.data || []);
-        // Initialize attendance status for all students as absent
-        setFormData(prev => ({
-          ...prev,
-          students: data.data.map(student => ({
-            student: student._id,
-            status: 'absent'
-          }))
-        }));
+      let response;
+      
+      // Check if it's an A/L stream
+      if (className.startsWith('A/L-')) {
+        // For A/L streams
+        const stream = className.replace('A/L-', '').toLowerCase();
+        console.log('Debug - Fetching students for stream:', stream);
+        response = await studentAPI.getStudentsByStream(stream);
       } else {
-        throw new Error(data.message || 'Failed to fetch students');
+        // For O/L classes
+        const match = className.match(/Grade-(\d+)-(\w)/);
+        if (!match) {
+          throw new Error('Invalid class format');
+        }
+        const grade = match[1];
+        const division = match[2];
+
+        console.log('Debug - Fetching students for grade:', grade, 'division:', division);
+        response = await studentAPI.getStudentsByClass(grade, division);
       }
+
+      console.log('Debug - API response:', response);
+
+      if (!response.success) {
+        throw new Error(response.message || 'Failed to fetch students');
+      }
+
+      const students = response.data;
+      
+      if (!Array.isArray(students)) {
+        console.error('Invalid students data:', students);
+        throw new Error('Invalid students data received from server');
+      }
+
+      console.log('Debug - Processed students:', students);
+
+      // Set the students in state and initialize form data
+      setStudents(students);
+      setFormData(prev => ({
+        ...prev,
+        students: students.map(student => ({
+          student: student._id,
+          status: 'absent'
+        }))
+      }));
+
+      // Only show warning if no students were found
+      if (students.length === 0) {
+        toast(`No students found in ${className.replace(/-/g, ' ')}`, {
+          icon: '⚠️',
+          duration: 4000
+        });
+      }
+
     } catch (error) {
-      console.error('Error fetching students:', error);
-      toast.error('Failed to fetch students');
-      setStudents([]);
+      console.error('Error fetching students:', {
+        error: error,
+        message: error.message,
+        stack: error.stack
+      });
+      toast.error(error.message || 'Failed to fetch students');
+      setStudents([]); // Reset students on error
+      setFormData(prev => ({ ...prev, students: [] })); // Reset form data on error
     } finally {
       setLoadingStudents(false);
     }
@@ -92,33 +137,67 @@ const AddAttendance = ({ onClose, onSuccess }) => {
       return;
     }
 
+    // Parse and normalize the date
+    const selectedDate = new Date(formData.date);
+    selectedDate.setHours(0, 0, 0, 0);
+
     // Log the data being sent
-    console.log('Submitting attendance data:', {
+    console.log('Debug - Submitting attendance data:', {
       class: formData.class,
-      date: formData.date,
-      students: formData.students
+      originalDate: formData.date,
+      normalizedDate: selectedDate.toISOString(),
+      studentsCount: formData.students.length,
+      firstStudent: formData.students[0],
+      lastStudent: formData.students[formData.students.length - 1]
     });
 
     try {
       setLoading(true);
       const response = await attendanceAPI.create({
         class: formData.class,
-        date: formData.date,
+        date: selectedDate.toISOString(),
         students: formData.students.map(student => ({
           student: student.student,
           status: student.status
         }))
       });
-      console.log('Server response:', response);
-      toast.success('Attendance recorded successfully');
-      onSuccess();
-    } catch (error) {
-      console.error('Error recording attendance:', error);
-      // Log more detailed error information
-      if (error.response) {
-        console.error('Server error details:', error.response.data);
+
+      console.log('Debug - Server response:', response);
+
+      if (!response || !response.success) {
+        throw new Error(response?.message || 'Failed to create attendance record');
       }
-      toast.error(error.response?.data?.message || 'Failed to record attendance');
+
+      toast.success('Attendance recorded successfully');
+      if (onSuccess) {
+        onSuccess();
+      }
+      if (onClose) {
+        onClose();
+      }
+    } catch (error) {
+      console.error('Debug - Error recording attendance:', {
+        error: error,
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        formData: {
+          class: formData.class,
+          date: formData.date,
+          normalizedDate: selectedDate.toISOString(),
+          studentsCount: formData.students.length
+        }
+      });
+      
+      // Show a more specific error message
+      let errorMessage = 'Failed to record attendance';
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -197,7 +276,7 @@ const AddAttendance = ({ onClose, onSuccess }) => {
               >
                 {allClasses.map((className) => (
                   <MenuItem key={className} value={className}>
-                    {className}
+                    {className.replace(/-/g, ' ')}
                   </MenuItem>
                 ))}
               </Select>

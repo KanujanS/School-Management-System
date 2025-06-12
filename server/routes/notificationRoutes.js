@@ -7,7 +7,7 @@ import {
   deleteNotification,
   markAsRead
 } from '../controllers/notificationController.js';
-import { protect } from '../middleware/authMiddleware.js';
+import { protect, admin, authorize } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
@@ -17,12 +17,12 @@ router.use(protect);
 // Routes
 router.route('/')
   .get(getNotifications)
-  .post(createNotification);
+  .post(authorize('admin', 'staff'), createNotification);
 
 router.route('/:id')
   .get(getNotificationById)
-  .put(updateNotification)
-  .delete(deleteNotification);
+  .put(admin, updateNotification)
+  .delete(protect, deleteNotification);
 
 router.put('/:id/mark-read', markAsRead);
 

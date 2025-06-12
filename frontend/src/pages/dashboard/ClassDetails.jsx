@@ -71,30 +71,36 @@ const ClassDetails = () => {
   });
 
   useEffect(() => {
+    const fetchStudents = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        let response;
+        if (stream) {
+          // For A/L streams
+          response = await studentAPI.getStudentsByStream(stream);
+        } else {
+          // For O/L classes
+          response = await studentAPI.getStudentsByClass(gradeId, division);
+        }
+
+        if (response.success) {
+          setStudents(response.data);
+        } else {
+          throw new Error(response.message || 'Failed to fetch students');
+        }
+      } catch (error) {
+        console.error('Error fetching students:', error);
+        setError(error.message);
+        toast.error('Failed to load students');
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchStudents();
   }, [gradeId, division, stream]);
-
-  const fetchStudents = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = stream 
-        ? await studentAPI.getStudentsByStream(stream)
-        : await studentAPI.getStudentsByClass(gradeId, division);
-      
-      if (response.success) {
-        setStudents(response.data);
-      } else {
-        throw new Error(response.message || 'Failed to fetch students');
-      }
-    } catch (error) {
-      console.error('Error fetching students:', error);
-      setError(error.message);
-      toast.error('Failed to load students');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -107,16 +113,75 @@ const ClassDetails = () => {
   const handleAddStudent = async (e) => {
     e.preventDefault();
     try {
+      // Validate required fields
+      const requiredFields = ['name', 'admissionNumber', 'gender', 'dateOfBirth', 'address', 'parentName', 'contactNumber', 'email'];
+      const missingFields = requiredFields.filter(field => !newStudent[field]);
+      
+      if (missingFields.length > 0) {
+        throw new Error(`Please fill in all required fields: ${missingFields.join(', ')}`);
+      }
+
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(newStudent.email)) {
+        throw new Error('Please enter a valid email address');
+      }
+
+      // Validate contact number (10 digits)
+      const contactRegex = /^\d{10}$/;
+      if (!contactRegex.test(newStudent.contactNumber)) {
+        throw new Error('Contact number must be exactly 10 digits');
+      }
+
+      // Create student data with all required fields
       const studentData = {
-        ...newStudent,
-        ...(stream ? { stream } : { grade: gradeId, division })
+        name: newStudent.name.trim(),
+        admissionNumber: newStudent.admissionNumber.trim(),
+        gender: newStudent.gender,
+        dateOfBirth: newStudent.dateOfBirth,
+        address: newStudent.address.trim(),
+        parentName: newStudent.parentName.trim(),
+        contactNumber: newStudent.contactNumber.trim(),
+        email: newStudent.email.trim().toLowerCase(),
+        password: newStudent.password || generatePassword(),
+        role: 'student'
       };
 
-      const response = await studentAPI.addStudent(studentData);
+      // Add class-specific data
+      if (stream) {
+        // For A/L streams
+        studentData.stream = stream;
+        studentData.class = `A/L-${stream}`;
+        studentData.isAdvancedLevel = true;
+        studentData.grade = 'A/L';
+      } else {
+        // For O/L classes
+        studentData.grade = Number(gradeId);
+        studentData.division = division.toUpperCase();
+        studentData.class = `Grade-${gradeId}-${division.toUpperCase()}`;
+        studentData.isAdvancedLevel = false;
+      }
+
+      // Log the data being sent
+      console.log('Debug - Student data being sent:', {
+        ...studentData,
+        password: '[REDACTED]'
+      });
+
+      const response = await studentAPI.create(studentData);
       
       if (response.success) {
         setStudents(prev => [...prev, response.data]);
-        toast.success('Student added successfully');
+        
+        // Show success message with password
+        toast.success(
+          <div>
+            Student added successfully!<br />
+            Initial Password: {studentData.password}
+          </div>,
+          { duration: 10000 }
+        );
+        
         handleCloseModal();
       } else {
         throw new Error(response.message || 'Failed to add student');
@@ -178,7 +243,7 @@ const ClassDetails = () => {
           <div className="text-red-800 text-xl mb-4">⚠️</div>
           <p className="text-gray-600">{error}</p>
           <button 
-            onClick={fetchStudents}
+            onClick={() => window.location.reload()}
             className="mt-4 px-4 py-2 bg-red-800 text-white rounded hover:bg-red-700"
           >
             Try Again
@@ -205,7 +270,7 @@ const ClassDetails = () => {
               {stream ? currentStream.name : `Grade ${gradeId} - Division ${division}`}
             </h1>
             <p className="mt-2 text-gray-600">
-              {stream ? 'Advanced Level Stream' : `Ordinary Level Class`}
+              {stream ? 'Advanced Level Stream' : 'Ordinary Level Class'}
             </p>
           </div>
           <button
@@ -409,15 +474,30 @@ const ClassDetails = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700">Password</label>
-                <div className="mt-1">
-                  <PasswordField 
-                    password={newStudent.password} 
-                    className="w-full bg-gray-50 p-2 rounded-md border border-gray-300" 
+                <div className="mt-1 relative">
+                  <input
+                    type="text"
+                    name="password"
+                    value={newStudent.password}
+                    onChange={handleInputChange}
+                    required
+                    minLength={8}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-900 focus:ring-red-900 sm:text-sm"
                   />
-                  <p className="mt-1 text-xs text-gray-500">
-                    This password will be used for LMS access. The student can change it after logging in.
-                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setNewStudent(prev => ({
+                      ...prev,
+                      password: generatePassword()
+                    }))}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-sm text-red-900 hover:text-red-800"
+                  >
+                    Generate New
+                  </button>
                 </div>
+                <p className="mt-1 text-xs text-gray-500">
+                  Password must be at least 8 characters. Click "Generate New" for a random password.
+                </p>
               </div>
 
               <div className="flex justify-end space-x-3 mt-6">

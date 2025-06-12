@@ -7,9 +7,14 @@ import studentRoutes from './routes/studentRoutes.js';
 import assignmentRoutes from './routes/assignmentRoutes.js';
 import markRoutes from './routes/markRoutes.js';
 import attendanceRoutes from './routes/attendanceRoutes.js';
+import notificationRoutes from './routes/notificationRoutes.js';
 import { errorHandler } from './middleware/errorMiddleware.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import userRoutes from './routes/userRoutes.js';
+import staffRoutes from './routes/staffRoutes.js';
+import morgan from 'morgan';
+import colors from 'colors';
 
 // ES Module equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -37,12 +42,20 @@ app.use(cors(corsOptions));
 // Regular middleware
 app.use(express.json());
 
+// Logging middleware
+if (process.env.NODE_ENV === 'development') {
+  app.use(morgan('dev'));
+}
+
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
 app.use('/api/students', studentRoutes);
-app.use('/api/assignments', assignmentRoutes);
+app.use('/api/staff', staffRoutes);
 app.use('/api/marks', markRoutes);
 app.use('/api/attendance', attendanceRoutes);
+app.use('/api/assignments', assignmentRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Serve static files from the uploads directory with proper CORS and security headers
 app.use('/uploads', (req, res, next) => {
@@ -68,7 +81,7 @@ const startServer = async () => {
     
     const PORT = process.env.PORT || 5002;
     app.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
+      console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`.yellow.bold);
       console.log(`Test the server: http://localhost:${PORT}/test`);
     });
   } catch (error) {

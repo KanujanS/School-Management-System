@@ -5,7 +5,20 @@ import Notification from '../models/Notification.js';
 // @access  Private
 export const getNotifications = async (req, res) => {
   try {
-    const notifications = await Notification.find({ userId: req.query.userId })
+    const { role } = req.user;
+    let query = {};
+
+    // If not admin, only show relevant notifications
+    if (role !== 'admin') {
+      query = {
+        $or: [
+          { recipients: 'all' },
+          { recipients: role === 'staff' ? 'staff' : 'students' }
+        ]
+      };
+    }
+
+    const notifications = await Notification.find(query)
       .sort({ date: -1 });
     res.json(notifications);
   } catch (error) {
@@ -32,16 +45,34 @@ export const getNotificationById = async (req, res) => {
 
 // @desc    Create new notification
 // @route   POST /api/notifications
-// @access  Private
+// @access  Private (Admin and Staff)
 export const createNotification = async (req, res) => {
   try {
-    const { userId, title, message, category } = req.body;
+    const { title, message, type, recipients } = req.body;
+
+    // Validate required fields
+    if (!title || !message) {
+      return res.status(400).json({ message: 'Title and message are required' });
+    }
+
+    // Only admins and staff can create notifications
+    if (req.user.role !== 'admin' && req.user.role !== 'staff') {
+      return res.status(403).json({ message: 'Not authorized to create notifications' });
+    }
+
+    // Staff can only send notifications to students
+    if (req.user.role === 'staff' && recipients === 'staff') {
+      return res.status(403).json({ message: 'Staff cannot send notifications to other staff members' });
+    }
+
     const notification = await Notification.create({
-      userId,
       title,
       message,
-      category
+      category: type || 'general',
+      recipients: recipients || 'all',
+      createdBy: req.user._id
     });
+
     res.status(201).json(notification);
   } catch (error) {
     console.error('Error creating notification:', error);
@@ -51,13 +82,20 @@ export const createNotification = async (req, res) => {
 
 // @desc    Update notification
 // @route   PUT /api/notifications/:id
-// @access  Private
+// @access  Private (Admin only)
 export const updateNotification = async (req, res) => {
   try {
     const notification = await Notification.findById(req.params.id);
+    
     if (!notification) {
       return res.status(404).json({ message: 'Notification not found' });
     }
+
+    // Only admins can update notifications
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized to update notifications' });
+    }
+
     const updatedNotification = await Notification.findByIdAndUpdate(
       req.params.id,
       req.body,
@@ -72,13 +110,20 @@ export const updateNotification = async (req, res) => {
 
 // @desc    Delete notification
 // @route   DELETE /api/notifications/:id
-// @access  Private
+// @access  Private (Admin and Staff)
 export const deleteNotification = async (req, res) => {
   try {
     const notification = await Notification.findById(req.params.id);
+    
     if (!notification) {
       return res.status(404).json({ message: 'Notification not found' });
     }
+
+    // Allow users to delete their own notifications or admins to delete any notification
+    if (req.user.role !== 'admin' && notification.createdBy.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Not authorized to delete this notification' });
+    }
+
     await notification.deleteOne();
     res.json({ message: 'Notification removed' });
   } catch (error) {

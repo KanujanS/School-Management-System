@@ -43,11 +43,19 @@ const studentSchema = new mongoose.Schema({
     required: [true, 'Password is required'],
     minlength: [8, 'Password must be at least 8 characters long']
   },
+  originalPassword: {
+    type: String,
+    select: false // Don't include in normal queries
+  },
   // For O/L students
   grade: {
-    type: Number,
-    min: 1,
-    max: 11
+    type: mongoose.Schema.Types.Mixed,  // Allow both Number and String for A/L
+    validate: {
+      validator: function(value) {
+        return value === 'A/L' || (typeof value === 'number' && value >= 1 && value <= 11);
+      },
+      message: 'Grade must be either "A/L" or a number between 1 and 11'
+    }
   },
   division: {
     type: String
@@ -56,6 +64,10 @@ const studentSchema = new mongoose.Schema({
   stream: {
     type: String,
     enum: ['physical-science', 'biological-science', 'commerce', 'arts', 'bio-technology', 'engineering-technology']
+  },
+  isAdvancedLevel: {
+    type: Boolean,
+    default: false
   },
   attendance: {
     type: Number,
@@ -79,8 +91,16 @@ studentSchema.pre('save', async function(next) {
     return next();
   }
   try {
-    const salt = await bcrypt.genSalt(10);
-    this.password = await bcrypt.hash(this.password, salt);
+    // Store the original password before hashing
+    if (!this.originalPassword) {
+      this.originalPassword = this.password;
+    }
+    
+    // Only hash if the password isn't already hashed (60 characters is the length of a bcrypt hash)
+    if (this.password.length !== 60) {
+      const salt = await bcrypt.genSalt(10);
+      this.password = await bcrypt.hash(this.password, salt);
+    }
     next();
   } catch (error) {
     next(error);
@@ -93,12 +113,22 @@ studentSchema.pre('save', function(next) {
   next();
 });
 
-// Ensure either (grade and division) or stream is provided
+// Update the validation pre-hook
 studentSchema.pre('validate', function(next) {
-  if ((this.grade && this.division && !this.stream) || (!this.grade && !this.division && this.stream)) {
-    next();
+  if (this.isAdvancedLevel) {
+    // For A/L students, require stream and grade='A/L'
+    if (this.stream && this.grade === 'A/L' && !this.division) {
+      next();
+    } else {
+      next(new Error('Advanced Level students must have a stream and grade="A/L"'));
+    }
   } else {
-    next(new Error('Either (grade and division) or stream must be provided'));
+    // For O/L students, require grade (number) and division
+    if (typeof this.grade === 'number' && this.division && !this.stream) {
+      next();
+    } else {
+      next(new Error('O/L students must have a numeric grade and division'));
+    }
   }
 });
 

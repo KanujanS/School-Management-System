@@ -11,6 +11,19 @@ const ProtectedRoute = ({ children }) => {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
+  // Check if user is trying to access a role-specific route
+  const roleRoutes = {
+    '/admin': 'admin',
+    '/staff': 'staff',
+    '/student': 'student'
+  };
+
+  const requestedRole = roleRoutes[location.pathname];
+  if (requestedRole && user.role !== requestedRole) {
+    // Redirect to their appropriate dashboard if trying to access wrong role's route
+    return <Navigate to={`/${user.role}`} replace />;
+  }
+
   return children;
 };
 

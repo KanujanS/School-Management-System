@@ -8,6 +8,16 @@ export const AuthProvider = ({ children }) => {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  // Function to check if token is valid
+  const isTokenValid = () => {
+    const token = localStorage.getItem('token');
+    if (!token) return false;
+    
+    // Add any additional token validation logic here if needed
+    return true;
+  };
 
   useEffect(() => {
     // Check if user and token are stored in localStorage
@@ -15,71 +25,120 @@ export const AuthProvider = ({ children }) => {
     const storedToken = localStorage.getItem('token');
     
     if (storedUser && storedToken) {
-      const userData = JSON.parse(storedUser);
-      // Check if user is active
-      if (!userData.isActive) {
-        // Clear stored data if user is inactive
+      try {
+        const userData = JSON.parse(storedUser);
+        // Validate required user data
+        if (!userData.role || !userData._id || !userData.name) {
+          throw new Error('Invalid user data');
+        }
+        
+        // Check if user is active
+        if (!userData.isActive) {
+          throw new Error('Account deactivated');
+        }
+
+        setUser(userData);
+        setIsAuthenticated(true);
+        
+        // Redirect to appropriate dashboard if on login page
+        if (window.location.pathname === '/login') {
+          // Check if there's a redirect path stored
+          const redirectPath = localStorage.getItem('redirectPath');
+          if (redirectPath) {
+            localStorage.removeItem('redirectPath');
+            navigate(redirectPath);
+          } else {
+            navigate(`/${userData.role}`);
+          }
+        }
+      } catch (error) {
+        console.error('Error restoring auth state:', error);
+        // Clear invalid data
         localStorage.removeItem('user');
         localStorage.removeItem('token');
         setUser(null);
-        toast.error('Your account has been deactivated. Please contact the administrator.');
+        setIsAuthenticated(false);
+        if (error.message === 'Account deactivated') {
+          toast.error('Your account has been deactivated. Please contact the administrator.');
+        }
         navigate('/login');
-      } else {
-        setUser(userData);
       }
     } else {
       // If either is missing, clear both for consistency
       localStorage.removeItem('user');
       localStorage.removeItem('token');
       setUser(null);
+      setIsAuthenticated(false);
     }
     setLoading(false);
   }, [navigate]);
 
-  const login = (userData) => {
-    // Validate user data
-    if (!userData || !userData.token) {
-      toast.error('Invalid login data received');
-      return;
-    }
+  const login = async (userData) => {
+    try {
+      // Validate user data
+      if (!userData || !userData.token || !userData.role || !userData._id || !userData.name) {
+        throw new Error('Invalid login data received');
+      }
 
-    // Check if user is active before logging in
-    if (!userData.isActive) {
-      toast.error('Your account has been deactivated. Please contact the administrator.');
-      return;
-    }
+      // Check if user is active
+      if (!userData.isActive) {
+        throw new Error('Account deactivated');
+      }
 
-    // Store user data in localStorage
-    localStorage.setItem('user', JSON.stringify(userData));
-    localStorage.setItem('token', userData.token);
-    setUser(userData);
-    
-    // Navigate based on user role
-    switch (userData.role) {
-      case 'admin':
-        navigate('/admin');
-        break;
-      case 'staff':
-        navigate('/staff');
-        break;
-      case 'student':
-        navigate('/student');
-        break;
-      default:
-        navigate('/login');
-        return; // Don't show success message if role is invalid
+      // Store user data in localStorage
+      localStorage.setItem('user', JSON.stringify(userData));
+      localStorage.setItem('token', userData.token);
+      setUser(userData);
+      setIsAuthenticated(true);
+      
+      // Check for redirect path
+      const redirectPath = localStorage.getItem('redirectPath');
+      if (redirectPath) {
+        localStorage.removeItem('redirectPath');
+        navigate(redirectPath);
+      } else {
+        // Navigate based on user role
+        switch (userData.role) {
+          case 'admin':
+          case 'staff':
+          case 'student':
+            navigate(`/${userData.role}`);
+            break;
+          default:
+            throw new Error('Invalid user role');
+        }
+      }
+      
+      toast.success('Login successful!');
+    } catch (error) {
+      console.error('Login error:', error);
+      // Clear any partially stored data
+      localStorage.removeItem('user');
+      localStorage.removeItem('token');
+      localStorage.removeItem('redirectPath');
+      setUser(null);
+      setIsAuthenticated(false);
+      
+      if (error.message === 'Account deactivated') {
+        toast.error('Your account has been deactivated. Please contact the administrator.');
+      } else {
+        toast.error(error.message || 'Login failed. Please try again.');
+      }
     }
-    
-    toast.success('Login successful!');
   };
 
-  const logout = () => {
-    // Clear both token and user data
+  const logout = (redirectToLogin = true) => {
+    // Clear auth data
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    localStorage.removeItem('redirectPath');
     setUser(null);
-    navigate('/login');
-    toast.success('Logged out successfully');
+    setIsAuthenticated(false);
+    
+    if (redirectToLogin) {
+      navigate('/login');
+      toast.success('Logged out successfully');
+    }
   };
 
   if (loading) {
@@ -91,7 +150,14 @@ export const AuthProvider = ({ children }) => {
   }
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      login, 
+      logout,
+      isAuthenticated,
+      isTokenValid,
+      role: user?.role || null
+    }}>
       {children}
     </AuthContext.Provider>
   );

@@ -22,16 +22,31 @@ const StudentDashboard = () => {
         setIsLoading(true);
         
         // Fetch assignments and marks data
-        const [assignmentsData, marksData] = await Promise.all([
+        const [assignmentsResponse, marksResponse] = await Promise.all([
           assignmentsAPI.getAll({ studentId: user._id }),
           marksAPI.getAll({ studentId: user._id })
         ]);
 
-        setAssignments(assignmentsData);
-        setMarks(marksData);
+        // Handle assignments response
+        if (assignmentsResponse.success) {
+          setAssignments(assignmentsResponse.data || []);
+        } else {
+          console.error('Error in assignments response:', assignmentsResponse.message);
+          setAssignments([]);
+        }
+
+        // Handle marks response
+        if (marksResponse.success) {
+          setMarks(marksResponse.data || []);
+        } else {
+          console.error('Error in marks response:', marksResponse.message);
+          setMarks([]);
+        }
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
         toast.error('Failed to load dashboard data');
+        setAssignments([]);
+        setMarks([]);
       } finally {
         setIsLoading(false);
       }

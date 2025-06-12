@@ -63,6 +63,14 @@ export const createAssignment = async (req, res) => {
     }
 
     try {
+      // Validate class name format
+      const className = req.body.class.toLowerCase();
+      const isValidClass = /^(grade-\d{1,2}-[a-f]|a\/l-[a-z-]+)$/.test(className);
+      if (!isValidClass) {
+        throw new Error('Invalid class name format. Use Grade-6-A or A/L-stream format');
+      }
+
+      // Process files
       const files = req.files || [];
       const attachments = files.map(file => ({
         fileName: file.originalname,
@@ -70,10 +78,22 @@ export const createAssignment = async (req, res) => {
         uploadedAt: new Date()
       }));
 
-      const assignmentData = {
+      console.log('Debug - Creating assignment:', {
         ...req.body,
-        attachments,
+        attachments: attachments.map(a => ({
+          fileName: a.fileName,
+          uploadedAt: a.uploadedAt
+        }))
+      });
+
+      const assignmentData = {
+        title: req.body.title,
+        description: req.body.description,
+        subject: req.body.subject,
+        class: className,
         dueDate: new Date(req.body.dueDate),
+        totalMarks: Number(req.body.totalMarks),
+        attachments,
         createdBy: req.user._id
       };
 
@@ -95,11 +115,15 @@ export const createAssignment = async (req, res) => {
         });
       }
 
-      console.error('Error creating assignment:', error);
-      res.status(500).json({
+      console.error('Error creating assignment:', {
+        error: error.message,
+        body: req.body,
+        files: req.files?.map(f => f.originalname)
+      });
+
+      res.status(error.name === 'ValidationError' ? 400 : 500).json({
         success: false,
-        message: 'Failed to create assignment',
-        error: error.message
+        message: error.message || 'Failed to create assignment'
       });
     }
   });
@@ -189,10 +213,12 @@ export const getAssignments = async (req, res) => {
       query.createdBy = staffId;
     }
 
-    // If class is provided, filter by class
+    // If class is provided, filter by class (case-insensitive)
     if (className) {
-      query.class = className;
+      query.class = className.toLowerCase();
     }
+
+    console.log('Debug - Fetching assignments with query:', query);
 
     const assignments = await Assignment.find(query)
       .sort({ createdAt: -1 })
@@ -201,7 +227,8 @@ export const getAssignments = async (req, res) => {
 
     res.json({
       success: true,
-      data: assignments
+      data: assignments,
+      message: `Successfully fetched ${assignments.length} assignments`
     });
   } catch (error) {
     console.error('Error fetching assignments:', error);
@@ -256,8 +283,11 @@ export const updateAssignment = async (req, res) => {
       });
     }
 
-    // Make sure user is assignment creator
-    if (assignment.createdBy.toString() !== req.user._id.toString()) {
+    // Allow admin to update any assignment, staff can only update their own
+    const isAdmin = req.user.role === 'admin';
+    const isCreator = assignment.createdBy.toString() === req.user._id.toString();
+
+    if (!isAdmin && !isCreator) {
       return res.status(401).json({
         success: false,
         message: 'Not authorized to update this assignment'
@@ -281,10 +311,18 @@ export const updateAssignment = async (req, res) => {
 
     res.json({
       success: true,
-      data: assignment
+      data: assignment,
+      message: 'Assignment updated successfully'
     });
   } catch (error) {
-    console.error('Error updating assignment:', error);
+    console.error('Error updating assignment:', {
+      error: error.message,
+      stack: error.stack,
+      userId: req.user?._id,
+      userRole: req.user?.role,
+      assignmentId: req.params.id
+    });
+
     res.status(500).json({
       success: false,
       message: 'Failed to update assignment',
@@ -298,6 +336,12 @@ export const updateAssignment = async (req, res) => {
 // @access  Private/Staff
 export const deleteAssignment = async (req, res) => {
   try {
+    console.log('Debug - Delete assignment request:', {
+      assignmentId: req.params.id,
+      userId: req.user._id,
+      userRole: req.user.role
+    });
+
     const assignment = await Assignment.findById(req.params.id);
 
     if (!assignment) {
@@ -307,8 +351,19 @@ export const deleteAssignment = async (req, res) => {
       });
     }
 
-    // Make sure user is assignment creator
-    if (assignment.createdBy.toString() !== req.user._id.toString()) {
+    // Allow admin to delete any assignment, staff can only delete their own
+    const isAdmin = req.user.role === 'admin';
+    const isCreator = assignment.createdBy.toString() === req.user._id.toString();
+
+    if (!isAdmin && !isCreator) {
+      console.log('Debug - Delete authorization failed:', {
+        userRole: req.user.role,
+        userId: req.user._id,
+        creatorId: assignment.createdBy,
+        isAdmin,
+        isCreator
+      });
+
       return res.status(401).json({
         success: false,
         message: 'Not authorized to delete this assignment'
@@ -317,12 +372,26 @@ export const deleteAssignment = async (req, res) => {
 
     await assignment.deleteOne();
 
+    console.log('Debug - Assignment deleted successfully:', {
+      assignmentId: req.params.id,
+      deletedBy: req.user._id,
+      userRole: req.user.role
+    });
+
     res.json({
       success: true,
-      data: {}
+      data: {},
+      message: 'Assignment deleted successfully'
     });
   } catch (error) {
-    console.error('Error deleting assignment:', error);
+    console.error('Error deleting assignment:', {
+      error: error.message,
+      stack: error.stack,
+      userId: req.user?._id,
+      userRole: req.user?.role,
+      assignmentId: req.params.id
+    });
+
     res.status(500).json({
       success: false,
       message: 'Failed to delete assignment',

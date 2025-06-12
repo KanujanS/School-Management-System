@@ -30,8 +30,8 @@ const attendanceSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Compound index to prevent duplicate attendance records for the same class and date
-attendanceSchema.index({ class: 1, date: 1 }, { unique: true });
+// Compound index to speed up class + date queries
+attendanceSchema.index({ class: 1, date: 1 });
 
 const Attendance = mongoose.model('Attendance', attendanceSchema);
 

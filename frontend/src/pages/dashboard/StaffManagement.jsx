@@ -174,7 +174,7 @@ const StaffManagement = () => {
 
   const handleRemoveStaff = async (staffId) => {
     const confirmDelete = window.confirm(
-      'Are you sure you want to deactivate this staff member? They will no longer be able to access the system.'
+      'Are you sure you want to remove this staff member? This action cannot be undone.'
     );
 
     if (!confirmDelete) {
@@ -182,12 +182,12 @@ const StaffManagement = () => {
     }
 
     try {
-      await authAPI.updateStaffStatus(staffId, false);
-      toast.success('Staff member deactivated successfully');
-      fetchStaffList();
+      await authAPI.removeStaff(staffId);
+      toast.success('Staff member removed successfully');
+      fetchStaffList(); // Refresh the staff list
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to deactivate staff member');
-      console.error('Error deactivating staff:', error);
+      toast.error(error.response?.data?.message || 'Failed to remove staff member');
+      console.error('Error removing staff:', error);
     }
   };
 
@@ -360,7 +360,7 @@ const StaffManagement = () => {
                     <button
                       onClick={() => handleRemoveStaff(staff._id)}
                       className="text-red-600 hover:text-red-900"
-                      title="Deactivate Staff"
+                      title="Remove Staff"
                     >
                       <TrashIcon className="w-5 h-5" />
                     </button>
@@ -373,13 +373,6 @@ const StaffManagement = () => {
                       <CheckCircleIcon className="w-5 h-5" />
                     </button>
                   )}
-                  <button
-                    onClick={() => setSelectedStaff(staff)}
-                    className="text-blue-600 hover:text-blue-900"
-                    title="Edit Staff"
-                  >
-                    <PencilIcon className="w-5 h-5" />
-                  </button>
                 </td>
               </tr>
             ))}

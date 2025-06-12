@@ -60,17 +60,47 @@ export const addBulkMarks = async (req, res, next) => {
     for (const markData of marks) {
       try {
         // Validate required fields
-        const { student, subject, class: className, examType, score, totalMarks } = markData;
+        const { studentName, admissionNumber, subject, class: className, examType, score, totalMarks } = markData;
 
-        if (!student || !subject || !className || !examType || score === undefined) {
+        if (!studentName || !admissionNumber || !subject || !className || !examType || score === undefined) {
           errors.push({ subject, error: 'Missing required fields' });
           continue;
         }
 
-        // Validate student exists
-        const studentUser = await User.findOne({ _id: student, role: 'student' });
+        // Find student by admission number or studentId
+        const studentUser = await User.findOne({ 
+          $or: [
+            { admissionNumber },
+            { studentId: admissionNumber }
+          ],
+          role: 'student',
+          status: { $ne: 'inactive' }
+        }).select('name admissionNumber studentId class');
+
         if (!studentUser) {
-          errors.push({ subject, error: 'Student not found or not a valid student' });
+          console.error('Student validation failed:', {
+            admissionNumber,
+            subject,
+            className
+          });
+          errors.push({ 
+            subject, 
+            error: `Student not found with admission number: ${admissionNumber}`
+          });
+          continue;
+        }
+
+        // Validate student belongs to the specified class
+        if (studentUser.class !== className) {
+          console.error('Class mismatch:', {
+            admissionNumber,
+            studentClass: studentUser.class,
+            providedClass: className
+          });
+          errors.push({ 
+            subject, 
+            error: `Student does not belong to class ${className}`
+          });
           continue;
         }
 
@@ -90,9 +120,9 @@ export const addBulkMarks = async (req, res, next) => {
 
         // Create or update mark
         const mark = await Mark.findOneAndUpdate(
-          { student, subject, examType },
+          { student: studentUser._id, subject, examType },
           {
-            student,
+            student: studentUser._id,
             subject,
             class: className,
             examType,
@@ -116,7 +146,7 @@ export const addBulkMarks = async (req, res, next) => {
         console.error('Error creating mark:', {
           error,
           markData,
-          studentId: markData.student
+          stack: error.stack
         });
         errors.push({ 
           subject: markData.subject, 

@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Grid, Typography, Card, CardContent, CircularProgress, Alert } from '@mui/material';
 import { useAuth } from '../../context/AuthContext';
-import { assignmentsAPI, marksAPI, attendanceAPI } from '../../services/api';
+import { assignmentsAPI, marksAPI, attendanceAPI, notificationAPI } from '../../services/api';
 import {
   DocumentPlusIcon,
   UserGroupIcon,
   AcademicCapIcon,
+  BellIcon
 } from '@heroicons/react/24/outline';
 import ImageSlider from '../../components/ImageSlider';
 import AddAssignment from '../../components/AddAssignment';
 import AddMarks from '../../components/AddMarks';
 import AddAttendance from '../../components/AddAttendance';
+import AddNotification from '../../components/AddNotification';
 import toast from 'react-hot-toast';
 
 const StaffDashboard = () => {
@@ -18,12 +20,14 @@ const StaffDashboard = () => {
   const [showAddAssignmentModal, setShowAddAssignmentModal] = useState(false);
   const [showAddMarksModal, setShowAddMarksModal] = useState(false);
   const [showAddAttendanceModal, setShowAddAttendanceModal] = useState(false);
+  const [showAddNotificationModal, setShowAddNotificationModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [dashboardData, setDashboardData] = useState({
     recentAssignments: [],
     recentMarks: [],
-    recentAttendance: []
+    recentAttendance: [],
+    recentNotifications: []
   });
 
   useEffect(() => {
@@ -33,16 +37,18 @@ const StaffDashboard = () => {
         setError(null);
 
         // Fetch data in parallel
-        const [assignmentsRes, marksRes, attendanceRes] = await Promise.all([
+        const [assignmentsRes, marksRes, attendanceRes, notificationsRes] = await Promise.all([
           assignmentsAPI.getAll({ limit: 5, staffId: user._id }),
           marksAPI.getAll({ limit: 5, staffId: user._id }),
-          attendanceAPI.getAll({ limit: 5, staffId: user._id })
+          attendanceAPI.getAll({ limit: 5, staffId: user._id }),
+          notificationAPI.getAll()
         ]);
 
         setDashboardData({
           recentAssignments: assignmentsRes.assignments || [],
           recentMarks: marksRes.marks || [],
-          recentAttendance: attendanceRes.attendance || []
+          recentAttendance: attendanceRes.attendance || [],
+          recentNotifications: Array.isArray(notificationsRes) ? notificationsRes : []
         });
       } catch (err) {
         console.error('Error fetching dashboard data:', err);
@@ -102,6 +108,28 @@ const StaffDashboard = () => {
     }
   };
 
+  const handleAddNotification = async (notificationData) => {
+    try {
+      const response = await notificationAPI.create({
+        ...notificationData,
+        userId: user._id,
+        category: notificationData.type
+      });
+      
+      if (response) {
+        setDashboardData(prev => ({
+          ...prev,
+          recentNotifications: [response, ...prev.recentNotifications.slice(0, 4)]
+        }));
+        setShowAddNotificationModal(false);
+        toast.success('Notification sent successfully');
+      }
+    } catch (error) {
+      console.error('Error sending notification:', error);
+      toast.error(error.message || 'Failed to send notification');
+    }
+  };
+
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="80vh">
@@ -124,84 +152,8 @@ const StaffDashboard = () => {
         Welcome, {user?.name}
       </Typography>
 
-      <Grid container spacing={3}>
-        {/* Recent Assignments */}
-        <Grid item xs={12} md={4}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                Recent Assignments
-              </Typography>
-              {dashboardData.recentAssignments.length === 0 ? (
-                <Typography color="textSecondary">No recent assignments</Typography>
-              ) : (
-                dashboardData.recentAssignments.map((assignment) => (
-                  <Box key={assignment._id} mb={2}>
-                    <Typography variant="subtitle1">{assignment.title}</Typography>
-                    <Typography variant="body2" color="textSecondary">
-                      {assignment.subject} - Due: {new Date(assignment.dueDate).toLocaleDateString()}
-                    </Typography>
-                  </Box>
-                ))
-              )}
-            </CardContent>
-          </Card>
-        </Grid>
-
-        {/* Recent Marks */}
-        <Grid item xs={12} md={4}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                Recent Marks
-              </Typography>
-              {dashboardData.recentMarks.length === 0 ? (
-                <Typography color="textSecondary">No recent marks</Typography>
-              ) : (
-                dashboardData.recentMarks.map((mark) => (
-                  <Box key={mark._id} mb={2}>
-                    <Typography variant="subtitle1">
-                      {mark.student?.name || 'Unknown Student'}
-                    </Typography>
-                    <Typography variant="body2" color="textSecondary">
-                      {mark.subject} - Score: {mark.score}/{mark.totalMarks}
-                    </Typography>
-                  </Box>
-                ))
-              )}
-            </CardContent>
-          </Card>
-        </Grid>
-
-        {/* Recent Attendance */}
-        <Grid item xs={12} md={4}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                Recent Attendance
-              </Typography>
-              {dashboardData.recentAttendance.length === 0 ? (
-                <Typography color="textSecondary">No recent attendance records</Typography>
-              ) : (
-                dashboardData.recentAttendance.map((record) => (
-                  <Box key={record._id} mb={2}>
-                    <Typography variant="subtitle1">{record.class}</Typography>
-                    <Typography variant="body2" color="textSecondary">
-                      {record.subject} - {new Date(record.date).toLocaleDateString()}
-                    </Typography>
-                    <Typography variant="body2" color="textSecondary">
-                      Present: {record.students.filter(s => s.status === 'present').length}
-                    </Typography>
-                  </Box>
-                ))
-              )}
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
-
       {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mt-6">
         <button
           onClick={() => setShowAddAssignmentModal(true)}
           className="p-6 bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow"
@@ -228,6 +180,15 @@ const StaffDashboard = () => {
           <h3 className="text-lg font-semibold text-gray-900">Mark Attendance</h3>
           <p className="mt-2 text-sm text-gray-600">Record student attendance</p>
         </button>
+
+        <button
+          onClick={() => setShowAddNotificationModal(true)}
+          className="p-6 bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow"
+        >
+          <BellIcon className="h-8 w-8 text-red-900 mb-4" />
+          <h3 className="text-lg font-semibold text-gray-900">Send Notification</h3>
+          <p className="mt-2 text-sm text-gray-600">Send announcements</p>
+        </button>
       </div>
 
       {/* Modals */}
@@ -250,6 +211,14 @@ const StaffDashboard = () => {
           onClose={() => setShowAddAttendanceModal(false)}
           onAdd={handleAddAttendance}
           selectedDate={new Date().toISOString().split('T')[0]}
+        />
+      )}
+
+      {showAddNotificationModal && (
+        <AddNotification
+          open={showAddNotificationModal}
+          onClose={() => setShowAddNotificationModal(false)}
+          onAdd={handleAddNotification}
         />
       )}
     </Box>

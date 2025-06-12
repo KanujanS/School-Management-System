@@ -35,15 +35,58 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       >
-        <Route path="/admin" element={<AdminDashboard />} />
-        <Route path="/admin/class/:gradeId/:division" element={<ClassDetails />} />
-        <Route path="/admin/stream/:stream" element={<ClassDetails />} />
-        <Route path="/staff" element={<StaffDashboard />} />
-        <Route path="/student" element={<StudentDashboard />} />
-        <Route path="/assignments" element={<Assignments />} />
-        <Route path="/attendance" element={<Attendance />} />
-        <Route path="/marks" element={<Marks />} />
-        <Route path="/notifications" element={<Notifications />} />
+        {/* Admin Routes */}
+        <Route path="/admin" element={
+          <ProtectedRoute>
+            <AdminDashboard />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/class/:gradeId/:division" element={
+          <ProtectedRoute>
+            <ClassDetails />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/stream/:stream" element={
+          <ProtectedRoute>
+            <ClassDetails />
+          </ProtectedRoute>
+        } />
+
+        {/* Staff Routes */}
+        <Route path="/staff" element={
+          <ProtectedRoute>
+            <StaffDashboard />
+          </ProtectedRoute>
+        } />
+
+        {/* Student Routes */}
+        <Route path="/student" element={
+          <ProtectedRoute>
+            <StudentDashboard />
+          </ProtectedRoute>
+        } />
+
+        {/* Common Feature Routes */}
+        <Route path="/assignments" element={
+          <ProtectedRoute>
+            <Assignments />
+          </ProtectedRoute>
+        } />
+        <Route path="/attendance" element={
+          <ProtectedRoute>
+            <Attendance />
+          </ProtectedRoute>
+        } />
+        <Route path="/marks" element={
+          <ProtectedRoute>
+            <Marks />
+          </ProtectedRoute>
+        } />
+        <Route path="/notifications" element={
+          <ProtectedRoute>
+            <Notifications />
+          </ProtectedRoute>
+        } />
       </Route>
 
       {/* Catch all route */}

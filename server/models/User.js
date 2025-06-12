@@ -54,19 +54,42 @@ const userSchema = new mongoose.Schema({
       return this.role === 'student';
     }
   },
-  class: {
+  admissionNumber: {
     type: String,
+    unique: true,
+    sparse: true,
     required: function() {
       return this.role === 'student';
     }
   },
-  grade: {
-    type: Number,
+  class: {
+    type: String,
     required: function() {
       return this.role === 'student';
     },
-    min: [1, 'Grade must be at least 1'],
-    max: [13, 'Grade cannot exceed 13']
+    validate: {
+      validator: function(v) {
+        // Allow both formats: "Grade-6-A" and "A/L-physical-science"
+        return /^(Grade-\d{1,2}-[A-F]|A\/L-[a-z-]+)$/.test(v);
+      },
+      message: props => `${props.value} is not a valid class format! Use Grade-6-A or A/L-stream format`
+    }
+  },
+  grade: {
+    type: mongoose.Schema.Types.Mixed,  // Allow both Number and String for A/L
+    required: function() {
+      return this.role === 'student';
+    },
+    validate: {
+      validator: function(value) {
+        return value === 'A/L' || (typeof value === 'number' && value >= 1 && value <= 11);
+      },
+      message: 'Grade must be either "A/L" or a number between 1 and 11'
+    }
+  },
+  isAdvancedLevel: {
+    type: Boolean,
+    default: false
   }
 }, {
   timestamps: true
@@ -80,11 +103,15 @@ userSchema.pre('save', async function(next) {
   
   try {
     // Store the original password before hashing
-    this.originalPassword = this.password;
+    if (!this.originalPassword) {
+      this.originalPassword = this.password;
+    }
     
-    // Hash the password
-    const salt = await bcrypt.genSalt(10);
-    this.password = await bcrypt.hash(this.password, salt);
+    // Only hash if the password isn't already hashed (60 characters is the length of a bcrypt hash)
+    if (this.password.length !== 60) {
+      const salt = await bcrypt.genSalt(10);
+      this.password = await bcrypt.hash(this.password, salt);
+    }
     next();
   } catch (error) {
     next(error);
@@ -93,14 +120,50 @@ userSchema.pre('save', async function(next) {
 
 // Normalize class name before saving
 userSchema.pre('save', function(next) {
-  if (this.role === 'student' && this.class) {
-    // Replace multiple spaces with a single hyphen
-    this.class = this.class.replace(/\s+/g, '-');
+  if (this.role === 'student') {
+    // Replace multiple spaces with a single hyphen and ensure proper format
+    if (this.class) {
+      this.class = this.class
+        .replace(/\s+/g, '-')
+        .toLowerCase()  // Convert to lowercase
+        .replace(/^grade\s*(\d{1,2})\s*-?\s*([a-f])$/i, 'Grade-$1-$2')
+        .replace(/^a\s*\/?\s*l\s*-?\s*(.+)$/i, 'A/L-$1');
+    }
+
+    // Synchronize studentId and admissionNumber
+    if (this.studentId && !this.admissionNumber) {
+      this.admissionNumber = this.studentId;
+    } else if (this.admissionNumber && !this.studentId) {
+      this.studentId = this.admissionNumber;
+    }
   }
   next();
 });
 
-// Compare password method
+// Add validation for Advanced Level students
+userSchema.pre('validate', function(next) {
+  if (this.role === 'student') {
+    if (this.isAdvancedLevel) {
+      // For A/L students
+      if (this.grade === 'A/L' && this.class.startsWith('A/L-')) {
+        next();
+      } else {
+        next(new Error('Advanced Level students must have grade="A/L" and class starting with "A/L-"'));
+      }
+    } else {
+      // For O/L students
+      if (typeof this.grade === 'number' && this.class.startsWith('Grade-')) {
+        next();
+      } else {
+        next(new Error('O/L students must have a numeric grade and class starting with "Grade-"'));
+      }
+    }
+  } else {
+    next();
+  }
+});
+
+// Method to check password
 userSchema.methods.matchPassword = async function(enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };

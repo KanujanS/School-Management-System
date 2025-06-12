@@ -26,9 +26,25 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      window.location.href = '/login';
+    // Only handle auth errors if we're not already on the login page
+    if (error.response?.status === 401 && !window.location.pathname.includes('/login')) {
+      // Check if it's a token-related error
+      const isAuthError = error.response?.data?.message?.toLowerCase().includes('token') ||
+                         error.response?.data?.message?.toLowerCase().includes('authentication') ||
+                         !error.response?.data?.message;
+
+      if (isAuthError) {
+        // Clear auth data
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        
+        // Store the current URL to redirect back after login
+        const currentPath = window.location.pathname;
+        localStorage.setItem('redirectPath', currentPath);
+        
+        // Redirect to login page
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }
@@ -135,19 +151,35 @@ export const assignmentsAPI = {
       // Create FormData for file upload
       const formData = new FormData();
       
+      // Format class name to match our system's format
+      const formattedData = {
+        ...assignmentData,
+        class: assignmentData.class.toLowerCase()
+      };
+      
       // Add all non-file fields
-      Object.keys(assignmentData).forEach(key => {
+      Object.keys(formattedData).forEach(key => {
         if (key !== 'attachments') {
-          formData.append(key, assignmentData[key]);
+          formData.append(key, formattedData[key]);
         }
       });
 
       // Add files
-      if (assignmentData.attachments && assignmentData.attachments.length > 0) {
-        assignmentData.attachments.forEach((attachment, index) => {
-          formData.append('attachments', attachment.file);
+      if (formattedData.attachments && formattedData.attachments.length > 0) {
+        formattedData.attachments.forEach(attachment => {
+          if (attachment.file) {
+            formData.append('attachments', attachment.file, attachment.fileName);
+          }
         });
       }
+
+      console.log('Debug - Sending assignment data:', {
+        ...formattedData,
+        attachments: formattedData.attachments?.map(a => ({
+          fileName: a.fileName,
+          uploadedAt: a.uploadedAt
+        }))
+      });
 
       const response = await api.post('/api/assignments', formData, {
         headers: {
@@ -163,7 +195,7 @@ export const assignmentsAPI = {
             ...attachment,
             fileUrl: attachment.fileUrl.startsWith('http') 
               ? attachment.fileUrl 
-              : `http://localhost:5002${attachment.fileUrl}`
+              : `${api.defaults.baseURL}${attachment.fileUrl}`
           }));
         }
       }
@@ -171,17 +203,50 @@ export const assignmentsAPI = {
       return response.data;
     } catch (error) {
       console.error('Error creating assignment:', error);
-      throw error;
+      
+      // Let the main interceptor handle 401 errors
+      if (error.response?.status === 401) {
+        throw error;
+      }
+      
+      throw new Error(error.response?.data?.message || error.message || 'Failed to create assignment');
     }
   },
 
   delete: async (assignmentId) => {
     try {
       const response = await api.delete(`/api/assignments/${assignmentId}`);
+      
+      // Check if the response indicates success
+      if (!response.data || !response.data.success) {
+        throw new Error(response.data?.message || 'Failed to delete assignment');
+      }
+      
       return response.data;
     } catch (error) {
-      console.error('Error deleting assignment:', error);
-      throw error;
+      console.error('Error deleting assignment:', {
+        error: error.message,
+        status: error.response?.status,
+        data: error.response?.data
+      });
+      
+      // Handle specific error cases
+      if (error.response?.status === 404) {
+        throw new Error('Assignment not found');
+      } else if (error.response?.status === 401) {
+        const errorMessage = error.response?.data?.message || '';
+        if (errorMessage.toLowerCase().includes('token') || 
+            errorMessage.toLowerCase().includes('authentication') ||
+            !errorMessage) {
+          // Let the interceptor handle the auth error
+          throw error;
+        } else {
+          // It's a permission error, not an auth error
+          throw new Error(errorMessage || 'Not authorized to delete this assignment');
+        }
+      }
+      
+      throw new Error(error.response?.data?.message || error.message || 'Failed to delete assignment');
     }
   }
 };
@@ -259,6 +324,8 @@ export const marksAPI = {
 
   create: async (markData) => {
     try {
+      console.log('Debug - Incoming mark data:', markData);
+
       // If it's a bulk creation
       if (Array.isArray(markData.marks)) {
         // Validate marks data
@@ -266,18 +333,19 @@ export const marksAPI = {
           throw new Error('No marks provided');
         }
 
-        // Validate each mark entry
-        markData.marks.forEach((mark, index) => {
-          if (!mark.student || !mark.subject || !mark.class || !mark.examType || mark.score === undefined) {
+        // Normalize class names and validate each mark entry
+        const normalizedMarks = markData.marks.map((mark, index) => {
+          if (!mark.studentName || !mark.admissionNumber || !mark.subject || !mark.class || !mark.examType || mark.score === undefined) {
             throw new Error(`Invalid mark data at index ${index}: Missing required fields`);
           }
-        });
 
-        // Normalize class names (replace spaces with hyphens)
-        const normalizedMarks = markData.marks.map(mark => ({
-          ...mark,
-          class: mark.class?.replace(/\\s+/g, '-')
-        }));
+          return {
+            ...mark,
+            class: mark.class.replace(/\s+/g, '-'),
+            score: Number(mark.score),
+            totalMarks: Number(mark.totalMarks || 100)
+          };
+        });
 
         console.log('Debug - Sending bulk marks:', normalizedMarks);
         
@@ -285,21 +353,19 @@ export const marksAPI = {
         
         console.log('Debug - Bulk marks response:', response.data);
 
-        // If the request was successful but some marks failed
-        if (response.data.errors || (response.data.success === false)) {
-          const errorMessage = response.data.errors 
-            ? response.data.errors.map(err => `${err.subject}: ${err.error}`).join(', ')
-            : response.data.message || 'Failed to save marks';
-          throw new Error(errorMessage);
+        if (!response.data.success) {
+          throw new Error(response.data.message || 'Failed to save marks');
         }
 
-        return response.data;
+        return response.data.data;
       }
       
       // Single mark creation
       const normalizedMark = {
         ...markData,
-        class: markData.class?.replace(/\\s+/g, '-')
+        class: markData.class?.replace(/\s+/g, '-'),
+        score: Number(markData.score),
+        totalMarks: Number(markData.totalMarks || 100)
       };
 
       console.log('Debug - Sending single mark:', normalizedMark);
@@ -308,7 +374,7 @@ export const marksAPI = {
       
       console.log('Debug - Single mark response:', response.data);
 
-      if (response.data.success === false) {
+      if (!response.data.success) {
         throw new Error(response.data.message || 'Failed to save mark');
       }
 
@@ -342,19 +408,72 @@ export const attendanceAPI = {
   getAll: async (params = {}) => {
     try {
       const response = await api.get('/api/attendance', { params });
-      return response.data;
+      
+      // Ensure we have valid data
+      if (!response.data || !response.data.success) {
+        console.error('Invalid attendance response:', response.data);
+        return { success: false, data: [] };
+      }
+
+      // Normalize the data
+      const normalizedData = response.data.data.map(record => ({
+        ...record,
+        students: record.students.map(student => {
+          // Handle populated student data
+          const studentData = student.student || {};
+          return {
+            ...student,
+            status: student.status || 'absent', // Default to absent if no status
+            student: {
+              _id: studentData._id || 'unknown',
+              name: studentData.name || 'Unknown Student',
+              admissionNumber: studentData.admissionNumber || studentData.studentId || 'N/A'
+            }
+          };
+        })
+      }));
+
+      console.log('Debug - Normalized attendance data:', normalizedData);
+      return { success: true, data: normalizedData };
     } catch (error) {
       console.error('Error fetching attendance:', error);
-      return [];
+      return { success: false, data: [] };
     }
   },
 
   create: async (attendanceData) => {
     try {
-      const response = await api.post('/api/attendance', attendanceData);
+      // Ensure date is properly formatted
+      const normalizedData = {
+        ...attendanceData,
+        date: new Date(attendanceData.date).toISOString()
+      };
+
+      console.log('Debug - Creating attendance with normalized data:', {
+        class: normalizedData.class,
+        date: normalizedData.date,
+        studentsCount: normalizedData.students?.length
+      });
+
+      const response = await api.post('/api/attendance', normalizedData);
+      
+      if (!response.data || !response.data.success) {
+        console.error('Invalid create attendance response:', response.data);
+        throw new Error(response.data?.message || 'Failed to create attendance record');
+      }
+
+      console.log('Debug - Create attendance response:', response.data);
       return response.data;
     } catch (error) {
-      console.error('Error creating attendance:', error);
+      console.error('Error creating attendance:', {
+        error: error.message,
+        response: error.response?.data,
+        data: {
+          class: attendanceData.class,
+          date: attendanceData.date,
+          studentsCount: attendanceData.students?.length
+        }
+      });
       throw error;
     }
   },
@@ -372,42 +491,61 @@ export const attendanceAPI = {
 
 // Student API
 export const studentAPI = {
-  getStudentsByClass: async (gradeId, division) => {
+  create: async (studentData) => {
     try {
-      const response = await api.get(`/api/students/class/${gradeId}/${division}`);
+      // Normalize the data before sending
+      const normalizedData = {
+        ...studentData,
+        // Normalize class name
+        class: studentData.class.replace(/\s+/g, '-'),
+        // If it's an A/L student, normalize the stream
+        ...(studentData.stream && {
+          stream: studentData.stream.replace(/\s+/g, '-')
+        })
+      };
+
+      console.log('Debug - Creating student with normalized data:', {
+        ...normalizedData,
+        password: '[REDACTED]'
+      });
+
+      const response = await api.post('/api/students', normalizedData);
+      
+      if (!response.data || !response.data.success) {
+        throw new Error(response.data?.message || 'Failed to create student');
+      }
+
       return response.data;
     } catch (error) {
-      console.error('Error fetching students:', error);
+      console.error('Error creating student:', {
+        error: error.message,
+        response: error.response?.data
+      });
+      if (error.response?.data?.message) {
+        throw new Error(error.response.data.message);
+      }
+      throw new Error('Failed to create student. Please try again.');
+    }
+  },
+
+  getStudentsByClass: async (grade, division) => {
+    try {
+      const response = await api.get(`/api/students/class/${grade}/${division}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching students by class:', error);
       throw error;
     }
   },
 
   getStudentsByStream: async (stream) => {
     try {
-      const response = await api.get(`/api/students/stream/${stream}`);
+      // Normalize stream name
+      const normalizedStream = stream.replace(/\s+/g, '-');
+      const response = await api.get(`/api/students/stream/${normalizedStream}`);
       return response.data;
     } catch (error) {
-      console.error('Error fetching students:', error);
-      throw error;
-    }
-  },
-
-  addStudent: async (studentData) => {
-    try {
-      const response = await api.post('/api/students', studentData);
-      return response.data;
-    } catch (error) {
-      console.error('Error adding student:', error);
-      throw error;
-    }
-  },
-
-  updateStudent: async (studentId, studentData) => {
-    try {
-      const response = await api.put(`/api/students/${studentId}`, studentData);
-      return response.data;
-    } catch (error) {
-      console.error('Error updating student:', error);
+      console.error('Error fetching students by stream:', error);
       throw error;
     }
   },
@@ -427,51 +565,100 @@ export const studentAPI = {
 export const userAPI = {
   getStudentsByClass: async (className) => {
     try {
-      console.log('Getting students for class:', className); // Debug log
+      // Normalize class name
+      const normalizedClassName = className.replace(/\s+/g, '-');
+      console.log('Debug - Fetching students with normalized class:', normalizedClassName);
+      
+      const response = await api.get(`/api/users/students/class/${encodeURIComponent(normalizedClassName)}`);
+      
+      console.log('Debug - API Response:', response.data);
 
-      // Remove any existing hyphens and normalize spaces
-      const normalizedClassName = className.replace(/-/g, ' ').trim();
-
-      const response = await api.get('/api/users/students', { 
-        params: { 
-          class: normalizedClassName
-        }
-      });
-
-      console.log('Students API response:', response.data); // Debug log
-
-      // Ensure we have a valid response
-      if (!response.data || !response.data.success) {
-        throw new Error(response.data?.message || 'Invalid response from server');
-      }
-
-      // Extract and validate student data
-      const studentsData = response.data.data || [];
-      if (!Array.isArray(studentsData)) {
-        throw new Error('Invalid students data format');
-      }
-
-      // Normalize student data
-      const validStudents = studentsData.map(student => ({
-        _id: student._id,
-        name: student.name || 'Unknown Student',
-        admissionNumber: student.studentId || 'N/A',
-        class: student.class || normalizedClassName
-      })).filter(student => student._id && student.name);
-
-      console.log('Processed students:', validStudents); // Debug log
-
-      return { 
-        success: true,
-        data: validStudents 
-      };
+      // Return the normalized data array
+      return Array.isArray(response.data) ? response.data : [];
     } catch (error) {
-      console.error('Error fetching students:', error);
-      throw error;
+      console.error('Error fetching students:', {
+        error: error.message,
+        className,
+        normalizedClassName: className.replace(/\s+/g, '-'),
+        response: error.response?.data
+      });
+      throw new Error(error.response?.data?.message || error.message || 'Failed to fetch students');
+    }
+  }
+};
+
+// Notification API
+export const notificationAPI = {
+  getAll: async () => {
+    try {
+      const response = await api.get('/api/notifications');
+      if (!response.data) {
+        throw new Error('No data received from server');
+      }
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching notifications:', {
+        error,
+        message: error.message,
+        response: error.response?.data
+      });
+      throw error.response?.data?.message || error.message || 'Failed to fetch notifications';
     }
   },
 
-  // ... rest of the userAPI methods ...
+  create: async (notificationData) => {
+    try {
+      const response = await api.post('/api/notifications', notificationData);
+      if (!response.data) {
+        throw new Error('No data received from server');
+      }
+      return response.data;
+    } catch (error) {
+      console.error('Error creating notification:', {
+        error,
+        data: notificationData,
+        message: error.message,
+        response: error.response?.data
+      });
+      throw error.response?.data?.message || error.message || 'Failed to create notification';
+    }
+  },
+
+  delete: async (id) => {
+    try {
+      const response = await api.delete(`/api/notifications/${id}`);
+      if (!response.data) {
+        throw new Error('No data received from server');
+      }
+      return response.data;
+    } catch (error) {
+      console.error('Error deleting notification:', {
+        error,
+        id,
+        message: error.message,
+        response: error.response?.data
+      });
+      throw error.response?.data?.message || error.message || 'Failed to delete notification';
+    }
+  },
+
+  markAsRead: async (id) => {
+    try {
+      const response = await api.put(`/api/notifications/${id}/mark-read`);
+      if (!response.data) {
+        throw new Error('No data received from server');
+      }
+      return response.data;
+    } catch (error) {
+      console.error('Error marking notification as read:', {
+        error,
+        id,
+        message: error.message,
+        response: error.response?.data
+      });
+      throw error.response?.data?.message || error.message || 'Failed to mark notification as read';
+    }
+  }
 };
 
-export default api; 
+export default api;

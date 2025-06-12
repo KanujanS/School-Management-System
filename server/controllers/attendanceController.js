@@ -15,30 +15,58 @@ export const getStudentsByClass = async (req, res) => {
       });
     }
 
-    console.log('Fetching students for class:', className); // Debug log
+    console.log('Debug - Fetching students for class:', {
+      requestedClass: className,
+      normalizedClass: decodeURIComponent(className)
+    });
 
     // Find all students in the class
     const students = await User.find({
       role: 'student',
-      class: className
-    }).select('_id name studentId class');
+      class: decodeURIComponent(className) // Class names are already hyphenated in the database
+    }).select('_id name admissionNumber class');
 
-    console.log('Found students:', students); // Debug log
+    console.log('Debug - Query results:', {
+      totalFound: students.length,
+      sample: students[0] ? {
+        id: students[0]._id,
+        name: students[0].name,
+        class: students[0].class
+      } : null,
+      query: {
+        role: 'student',
+        class: decodeURIComponent(className)
+      }
+    });
 
+    // Return empty array if no students found
     if (!students || students.length === 0) {
       return res.json({
         success: true,
         data: [],
-        message: 'No students found in this class'
+        message: `No students found in class: ${decodeURIComponent(className).replace(/-/g, ' ')}`
       });
     }
 
+    // Return the students with normalized data
+    const normalizedStudents = students.map(student => ({
+      _id: student._id,
+      name: student.name,
+      admissionNumber: student.admissionNumber || student.studentId || 'N/A',
+      class: student.class
+    }));
+
     res.json({
       success: true,
-      data: students
+      data: normalizedStudents,
+      message: `Found ${normalizedStudents.length} students in class: ${decodeURIComponent(className).replace(/-/g, ' ')}`
     });
   } catch (error) {
-    console.error('Error fetching students:', error);
+    console.error('Error in getStudentsByClass:', {
+      error: error.message,
+      stack: error.stack,
+      query: req.query
+    });
     res.status(500).json({
       success: false,
       message: 'Failed to fetch students',
@@ -54,41 +82,40 @@ export const createAttendance = async (req, res) => {
   try {
     const { class: className, date, students } = req.body;
 
-    // Validate required fields
     if (!className || !date || !students || !Array.isArray(students) || students.length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide class, date, and students array'
+        message: 'Please provide class, date, and a non-empty students array'
       });
     }
 
-    // Validate student entries
-    for (const student of students) {
-      if (!student.student || !student.status || !['present', 'absent'].includes(student.status)) {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid student data. Each student must have an ID and status (present/absent)'
-        });
-      }
-    }
+    const invalidStudents = students.filter(
+      s => !s.student || !s.status || !['present', 'absent'].includes(s.status)
+    );
 
-    // Check if attendance for this class and date already exists
-    const existingAttendance = await Attendance.findOne({
-      class: className,
-      date: new Date(date)
-    });
-
-    if (existingAttendance) {
+    if (invalidStudents.length > 0) {
       return res.status(400).json({
         success: false,
-        message: 'Attendance for this class and date already exists'
+        message: 'Each student must have an ID and a status (present/absent)'
       });
     }
 
-    // Create attendance record
+    // Normalize the date to get full day range
+    const parsedDate = new Date(date);
+    if (isNaN(parsedDate)) {
+      return res.status(400).json({ success: false, message: 'Invalid date format' });
+    }
+
+    const startOfDay = new Date(parsedDate);
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date(parsedDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+
     const attendance = await Attendance.create({
       class: className,
-      date: new Date(date),
+      date: startOfDay, // store normalized date
       students: students.map(s => ({
         student: s.student,
         status: s.status
@@ -96,24 +123,18 @@ export const createAttendance = async (req, res) => {
       createdBy: req.user._id
     });
 
-    // Populate references
     await attendance.populate([
-      {
-        path: 'students.student',
-        select: 'name admissionNumber'
-      },
-      {
-        path: 'createdBy',
-        select: 'name'
-      }
+      { path: 'students.student', select: 'name admissionNumber' },
+      { path: 'createdBy', select: 'name' }
     ]);
 
     res.status(201).json({
       success: true,
-      data: attendance
+      data: attendance,
+      message: 'Attendance record created successfully'
     });
   } catch (error) {
-    console.error('Error creating attendance record:', error);
+    console.error('Error creating attendance:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to create attendance record',
@@ -128,24 +149,19 @@ export const createAttendance = async (req, res) => {
 export const getAttendance = async (req, res) => {
   try {
     const { class: className, date, staffId, limit = 10 } = req.query;
-    
-    // Build query
+
     const query = {};
-    
-    // If class is provided, filter by class
-    if (className) {
-      query.class = className;
-    }
 
-    // If date is provided, filter by date
+    if (className) query.class = className;
+
     if (date) {
-      query.date = new Date(date);
+      const parsedDate = new Date(date);
+      const nextDate = new Date(parsedDate);
+      nextDate.setDate(parsedDate.getDate() + 1);
+      query.date = { $gte: parsedDate, $lt: nextDate };
     }
 
-    // If staffId is provided, filter by creator
-    if (staffId) {
-      query.createdBy = staffId;
-    }
+    if (staffId) query.createdBy = staffId;
 
     const attendance = await Attendance.find(query)
       .sort({ date: -1, createdAt: -1 })

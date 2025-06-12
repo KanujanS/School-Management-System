@@ -16,15 +16,15 @@ const AddAssignment = ({ onClose, onAdd }) => {
   const allClasses = [
     // O/L Classes (Grade 6-11)
     ...[6, 7, 8, 9, 10, 11].flatMap((grade) =>
-      ["A", "B", "C", "D", "E", "F"].map((division) => `${grade}${division}`)
+      ["A", "B", "C", "D", "E", "F"].map((division) => `Grade-${grade}-${division}`)
     ),
     // A/L Classes with detailed streams
-    "AL-Physical Science",
-    "AL-Biological Science",
-    "AL-Engineering Technology",
-    "AL-Bio Technology",
-    "AL-Commerce",
-    "AL-Arts",
+    "A/L-physical-science",
+    "A/L-biological-science",
+    "A/L-engineering-technology",
+    "A/L-bio-technology",
+    "A/L-commerce",
+    "A/L-arts",
   ];
 
   const handleChange = (e) => {
@@ -59,9 +59,26 @@ const AddAssignment = ({ onClose, onAdd }) => {
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    onAdd(formData);
+    
+    // Format the data before sending
+    const formattedData = {
+      ...formData,
+      class: formData.class.toLowerCase(), // Ensure class name is lowercase
+      attachments: formData.attachments.map(attachment => ({
+        fileName: attachment.fileName,
+        uploadedAt: attachment.uploadedAt,
+        file: attachment.file
+      }))
+    };
+
+    try {
+      await onAdd(formattedData);
+    } catch (error) {
+      console.error('Error adding assignment:', error);
+      // You might want to show an error toast here
+    }
   };
 
   // Cleanup URLs when component unmounts

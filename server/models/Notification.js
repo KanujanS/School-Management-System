@@ -1,10 +1,6 @@
 import mongoose from 'mongoose';
 
 const notificationSchema = new mongoose.Schema({
-  userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    required: true
-  },
   title: {
     type: String,
     required: true
@@ -15,12 +11,22 @@ const notificationSchema = new mongoose.Schema({
   },
   category: {
     type: String,
-    enum: ['assignment', 'marks', 'attendance', 'general'],
+    enum: ['general', 'academic', 'event', 'urgent'],
     default: 'general'
+  },
+  recipients: {
+    type: String,
+    enum: ['all', 'staff', 'students'],
+    default: 'all'
   },
   isRead: {
     type: Boolean,
     default: false
+  },
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
   },
   date: {
     type: Date,

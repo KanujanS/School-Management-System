@@ -16,9 +16,13 @@ import {
   DialogActions,
   DialogContent,
   DialogContentText,
-  DialogTitle
+  DialogTitle,
+  List,
+  ListItem,
+  ListItemText,
+  Divider
 } from '@mui/material';
-import { Add as AddIcon, Delete as DeleteIcon } from '@mui/icons-material';
+import { Add as AddIcon, Delete as DeleteIcon, Visibility as VisibilityIcon } from '@mui/icons-material';
 import { attendanceAPI } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import AddAttendance from '../../components/AddAttendance';
@@ -30,17 +34,20 @@ const Attendance = () => {
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     fetchAttendanceRecords();
-  }, []);
+  }, [user]);
 
   const fetchAttendanceRecords = async () => {
     try {
       setLoading(true);
-      const response = await attendanceAPI.getAll();
+      // If user is a student, fetch only their attendance
+      const params = user?.role === 'student' ? { studentId: user._id } : {};
+      const response = await attendanceAPI.getAll(params);
       if (response.success) {
         setAttendanceRecords(response.data || []);
       } else {
@@ -49,6 +56,7 @@ const Attendance = () => {
     } catch (error) {
       console.error('Error fetching attendance records:', error);
       toast.error('Failed to load attendance records');
+      setAttendanceRecords([]);
     } finally {
       setLoading(false);
     }
@@ -90,8 +98,18 @@ const Attendance = () => {
     setSelectedRecord(null);
   };
 
+  const handleViewClick = (record) => {
+    setSelectedRecord(record);
+    setViewDialogOpen(true);
+  };
+
+  const handleViewClose = () => {
+    setViewDialogOpen(false);
+    setSelectedRecord(null);
+  };
+
   const getStatusColor = (status) => {
-    switch (status) {
+    switch (status?.toLowerCase()) {
       case 'present':
         return 'success';
       case 'absent':
@@ -99,7 +117,7 @@ const Attendance = () => {
       case 'late':
         return 'warning';
       default:
-        return 'default';
+        return 'error'; // Default to error (red) for absent/unknown status
     }
   };
 
@@ -107,19 +125,22 @@ const Attendance = () => {
     <Box p={3}>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h5">Attendance Records</Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => setShowAddModal(true)}
-          sx={{
-            backgroundColor: '#7f1d1d',
-            '&:hover': {
-              backgroundColor: '#991b1b',
-            },
-          }}
-        >
-          Record Attendance
-        </Button>
+        {/* Only show Record Attendance button for staff and admin */}
+        {(user?.role === 'staff' || user?.role === 'admin') && (
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => setShowAddModal(true)}
+            sx={{
+              backgroundColor: '#7f1d1d',
+              '&:hover': {
+                backgroundColor: '#991b1b',
+              },
+            }}
+          >
+            Record Attendance
+          </Button>
+        )}
       </Box>
 
       {loading ? (
@@ -136,45 +157,80 @@ const Attendance = () => {
             <TableHead>
               <TableRow>
                 <TableCell>Date</TableCell>
-                <TableCell>Class</TableCell>
-                <TableCell>Present</TableCell>
-                <TableCell>Absent</TableCell>
-                <TableCell align="center">Actions</TableCell>
+                {user?.role !== 'student' && <TableCell>Class</TableCell>}
+                {user?.role === 'student' ? (
+                  <TableCell align="center">Status</TableCell>
+                ) : (
+                  <>
+                    <TableCell>Present</TableCell>
+                    <TableCell>Absent</TableCell>
+                  </>
+                )}
+                {user?.role !== 'student' && <TableCell align="center">Actions</TableCell>}
               </TableRow>
             </TableHead>
             <TableBody>
               {attendanceRecords.map((record) => {
+                // For students, find their own attendance status
+                const studentStatus = user?.role === 'student' 
+                  ? record.students.find(s => s.student._id === user._id)?.status || 'absent'
+                  : null;
+
+                // For staff/admin, calculate present and absent counts
                 const presentCount = record.students.filter(s => s.status === 'present').length;
                 const absentCount = record.students.filter(s => s.status === 'absent').length;
 
                 return (
                   <TableRow key={record._id}>
                     <TableCell>{new Date(record.date).toLocaleDateString()}</TableCell>
-                    <TableCell>{record.class}</TableCell>
-                    <TableCell>
-                      <Chip
-                        label={presentCount}
-                        color="success"
-                        size="small"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Chip
-                        label={absentCount}
-                        color="error"
-                        size="small"
-                      />
-                    </TableCell>
-                    <TableCell align="center">
-                      <IconButton 
-                        size="small" 
-                        color="error"
-                        onClick={() => handleDeleteClick(record)}
-                        disabled={deleting && selectedRecord?._id === record._id}
-                      >
-                        <DeleteIcon />
-                      </IconButton>
-                    </TableCell>
+                    {user?.role !== 'student' && <TableCell>{record.class}</TableCell>}
+                    {user?.role === 'student' ? (
+                      <TableCell align="center">
+                        <Chip
+                          label={studentStatus.charAt(0).toUpperCase() + studentStatus.slice(1)}
+                          color={getStatusColor(studentStatus)}
+                          size="small"
+                        />
+                      </TableCell>
+                    ) : (
+                      <>
+                        <TableCell>
+                          <Chip
+                            label={presentCount}
+                            color="success"
+                            size="small"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Chip
+                            label={absentCount}
+                            color="error"
+                            size="small"
+                          />
+                        </TableCell>
+                      </>
+                    )}
+                    {user?.role !== 'student' && (
+                      <TableCell align="center">
+                        <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1 }}>
+                          <IconButton 
+                            size="small" 
+                            color="primary"
+                            onClick={() => handleViewClick(record)}
+                          >
+                            <VisibilityIcon />
+                          </IconButton>
+                          <IconButton 
+                            size="small" 
+                            color="error"
+                            onClick={() => handleDeleteClick(record)}
+                            disabled={deleting && selectedRecord?._id === record._id}
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        </Box>
+                      </TableCell>
+                    )}
                   </TableRow>
                 );
               })}
@@ -184,17 +240,19 @@ const Attendance = () => {
       )}
 
       {/* Add Attendance Modal */}
-      <Dialog
-        open={showAddModal}
-        onClose={() => setShowAddModal(false)}
-        maxWidth="md"
-        fullWidth
-      >
-        <AddAttendance
+      {showAddModal && (
+        <Dialog
+          open={showAddModal}
           onClose={() => setShowAddModal(false)}
-          onSuccess={handleAddSuccess}
-        />
-      </Dialog>
+          maxWidth="md"
+          fullWidth
+        >
+          <AddAttendance
+            onClose={() => setShowAddModal(false)}
+            onSuccess={handleAddSuccess}
+          />
+        </Dialog>
+      )}
 
       {/* Delete Confirmation Dialog */}
       <Dialog
@@ -218,6 +276,98 @@ const Attendance = () => {
             disabled={deleting}
           >
             {deleting ? 'Deleting...' : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* View Attendance Details Dialog */}
+      <Dialog
+        open={viewDialogOpen}
+        onClose={handleViewClose}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          Attendance Details - {selectedRecord?.class}
+          <Typography variant="subtitle2" color="text.secondary">
+            {selectedRecord ? new Date(selectedRecord.date).toLocaleDateString() : ''}
+          </Typography>
+        </DialogTitle>
+        <DialogContent>
+          {selectedRecord && (
+            <Box>
+              <Box mb={2}>
+                <Typography variant="subtitle1" gutterBottom>
+                  Summary
+                </Typography>
+                <Box display="flex" gap={2}>
+                  <Chip
+                    label={`Present: ${selectedRecord.students.filter(s => s.status === 'present').length}`}
+                    color="success"
+                  />
+                  <Chip
+                    label={`Absent: ${selectedRecord.students.filter(s => s.status === 'absent').length}`}
+                    color="error"
+                  />
+                </Box>
+              </Box>
+              
+              <Divider sx={{ my: 2 }} />
+              
+              <Typography variant="subtitle1" gutterBottom>
+                Student Details
+              </Typography>
+              <List>
+                {selectedRecord.students.map((student, index) => {
+                  // Safely access student data
+                  const studentData = student.student || {};
+                  const studentName = studentData.name || 'Unknown Student';
+                  const studentId = studentData.admissionNumber || 'N/A';
+                  const status = student.status || 'unknown';
+                  
+                  return (
+                    <React.Fragment key={studentData._id || index}>
+                      <ListItem>
+                        <ListItemText
+                          primary={
+                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                              <Typography component="span" variant="body1" sx={{ fontWeight: 500 }}>
+                                {studentName}
+                              </Typography>
+                              <Typography 
+                                component="span" 
+                                variant="body2" 
+                                color="text.secondary" 
+                                sx={{ ml: 2 }}
+                              >
+                                ID: {studentId}
+                              </Typography>
+                            </Box>
+                          }
+                          secondary={
+                            <Typography variant="body2" sx={{ mt: 0.5 }}>
+                              Status: {status.charAt(0).toUpperCase() + status.slice(1)}
+                            </Typography>
+                          }
+                        />
+                        <Chip
+                          size="small"
+                          color={status === 'present' ? 'success' : 'error'}
+                          label={status.charAt(0).toUpperCase() + status.slice(1)}
+                          sx={{ ml: 2 }}
+                        />
+                      </ListItem>
+                      {index < selectedRecord.students.length - 1 && <Divider />}
+                    </React.Fragment>
+                  );
+                })}
+              </List>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleViewClose}>
+            Close
           </Button>
         </DialogActions>
       </Dialog>
