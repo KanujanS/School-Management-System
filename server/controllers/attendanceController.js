@@ -109,10 +109,7 @@ export const createAttendance = async (req, res) => {
     const startOfDay = new Date(parsedDate);
     startOfDay.setHours(0, 0, 0, 0);
 
-    const endOfDay = new Date(parsedDate);
-    endOfDay.setHours(23, 59, 59, 999);
-
-
+    // Create the attendance record
     const attendance = await Attendance.create({
       class: className,
       date: startOfDay, // store normalized date
@@ -134,7 +131,11 @@ export const createAttendance = async (req, res) => {
       message: 'Attendance record created successfully'
     });
   } catch (error) {
-    console.error('Error creating attendance:', error);
+    console.error('Error creating attendance:', {
+      error: error.message,
+      stack: error.stack,
+      requestBody: req.body
+    });
     res.status(500).json({
       success: false,
       message: 'Failed to create attendance record',
@@ -169,13 +170,28 @@ export const getAttendance = async (req, res) => {
       .populate([
         {
           path: 'students.student',
-          select: 'name admissionNumber'
+          select: 'name admissionNumber class'
         },
         {
           path: 'createdBy',
           select: 'name'
         }
       ]);
+
+    // Log the populated data for debugging
+    console.log('Debug - Populated attendance data:', {
+      count: attendance.length,
+      sample: attendance[0] ? {
+        class: attendance[0].class,
+        date: attendance[0].date,
+        studentsCount: attendance[0].students.length,
+        firstStudent: attendance[0].students[0] ? {
+          name: attendance[0].students[0].student?.name,
+          admissionNumber: attendance[0].students[0].student?.admissionNumber,
+          status: attendance[0].students[0].status
+        } : null
+      } : null
+    });
 
     res.json({
       success: true,
@@ -308,6 +324,28 @@ export const updateAttendance = async (req, res) => {
 // @access  Private/Staff
 export const deleteAttendance = async (req, res) => {
   try {
+    console.log('Debug - Delete attendance request:', {
+      attendanceId: req.params.id,
+      userId: req.user._id,
+      userRole: req.user.role
+    });
+
+    // Check if user is authenticated
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({
+        success: false,
+        message: 'Not authenticated'
+      });
+    }
+
+    // Check if user has permission (must be staff or admin)
+    if (!['staff', 'admin'].includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to delete attendance records'
+      });
+    }
+
     const attendance = await Attendance.findById(req.params.id);
 
     if (!attendance) {
@@ -317,9 +355,15 @@ export const deleteAttendance = async (req, res) => {
       });
     }
 
-    // Make sure user is attendance creator
-    if (attendance.createdBy.toString() !== req.user._id.toString()) {
-      return res.status(401).json({
+    // Make sure user is attendance creator or admin
+    if (attendance.createdBy.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+      console.log('Debug - Delete authorization failed:', {
+        userRole: req.user.role,
+        userId: req.user._id,
+        creatorId: attendance.createdBy
+      });
+
+      return res.status(403).json({
         success: false,
         message: 'Not authorized to delete this attendance record'
       });
@@ -327,12 +371,26 @@ export const deleteAttendance = async (req, res) => {
 
     await attendance.deleteOne();
 
+    console.log('Debug - Attendance deleted successfully:', {
+      attendanceId: req.params.id,
+      deletedBy: req.user._id,
+      userRole: req.user.role
+    });
+
     res.json({
       success: true,
-      data: {}
+      data: {},
+      message: 'Attendance record deleted successfully'
     });
   } catch (error) {
-    console.error('Error deleting attendance record:', error);
+    console.error('Error deleting attendance record:', {
+      error: error.message,
+      stack: error.stack,
+      userId: req.user?._id,
+      userRole: req.user?.role,
+      attendanceId: req.params.id
+    });
+
     res.status(500).json({
       success: false,
       message: 'Failed to delete attendance record',

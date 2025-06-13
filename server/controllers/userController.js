@@ -48,30 +48,29 @@ export const deleteUser = async (req, res) => {
 };
 
 // @desc    Get students by class
-
-// @desc    Get students by class
-// @route   GET /api/users/students/class/:className
-// @access  Private
+// @route   GET /api/users/students
+// @access  Private/Staff
 export const getStudentsByClass = async (req, res) => {
   try {
-    const { className } = req.params;
+    // Get class from either query params or URL params
+    const className = req.query.class || req.params.className;
     
     if (!className) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide a class name'
+        message: 'Please provide a class'
       });
     }
 
     console.log('Debug - Fetching students for class:', {
       requestedClass: className,
-      decodedClass: decodeURIComponent(className)
+      normalizedClass: decodeURIComponent(className)
     });
 
     // Find all students in the class
     const students = await User.find({
       role: 'student',
-      class: decodeURIComponent(className)
+      class: decodeURIComponent(className) // Class names are already hyphenated in the database
     }).select('_id name admissionNumber class');
 
     console.log('Debug - Query results:', {
@@ -89,7 +88,11 @@ export const getStudentsByClass = async (req, res) => {
 
     // Return empty array if no students found
     if (!students || students.length === 0) {
-      return res.json([]);
+      return res.json({
+        success: true,
+        data: [],
+        message: `No students found in class: ${decodeURIComponent(className).replace(/-/g, ' ')}`
+      });
     }
 
     // Return the students with normalized data
@@ -100,11 +103,16 @@ export const getStudentsByClass = async (req, res) => {
       class: student.class
     }));
 
-    res.json(normalizedStudents);
+    res.json({
+      success: true,
+      data: normalizedStudents,
+      message: `Found ${normalizedStudents.length} students in class: ${decodeURIComponent(className).replace(/-/g, ' ')}`
+    });
   } catch (error) {
     console.error('Error in getStudentsByClass:', {
       error: error.message,
       stack: error.stack,
+      query: req.query,
       params: req.params
     });
     res.status(500).json({

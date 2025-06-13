@@ -168,12 +168,19 @@ const AddAttendance = ({ onClose, onSuccess }) => {
         throw new Error(response?.message || 'Failed to create attendance record');
       }
 
-      toast.success('Attendance recorded successfully');
+      toast.success(`Attendance recorded successfully for ${formData.class}`);
+      
+      // Reset form for next class
+      setFormData(prev => ({
+        ...prev,
+        class: '',
+        students: []
+      }));
+      setStudents([]);
+      
+      // Call onSuccess to refresh the attendance list
       if (onSuccess) {
         onSuccess();
-      }
-      if (onClose) {
-        onClose();
       }
     } catch (error) {
       console.error('Debug - Error recording attendance:', {

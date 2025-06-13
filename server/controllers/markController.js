@@ -1,370 +1,265 @@
 import Mark from '../models/Mark.js';
-import User from '../models/User.js';
+import Student from '../models/Student.js';
 
-// @desc    Add or update marks
-// @route   POST /api/marks
-// @access  Private (Staff/Admin)
-export const addMarks = async (req, res, next) => {
-  try {
-    const { student, subject, class: className, examType, score, totalMarks, grade, remarks } = req.body;
-
-    // Validate student exists and belongs to the specified class
-    const studentUser = await User.findOne({ _id: student, role: 'student' });
-    if (!studentUser) {
-      const error = new Error('Invalid student');
-      error.status = 400;
-      throw error;
+// Get all marks for staff and admin users
+export const getAllMarks = async (req, res, next) => {
+    try {
+        const marks = await Mark.find().populate('addedBy', 'name');
+        
+        res.status(200).json({
+            success: true,
+            data: marks
+        });
+    } catch (error) {
+        next(error);
     }
-
-    // Create or update marks
-    const mark = await Mark.findOneAndUpdate(
-      { student, subject, examType },
-      {
-        student,
-        subject,
-        class: className,
-        examType,
-        score,
-        totalMarks,
-        grade,
-        remarks,
-        markedBy: req.user._id
-      },
-      { new: true, upsert: true, runValidators: true }
-    ).populate('student', 'name admissionNumber class')
-      .populate('markedBy', 'name');
-
-    res.status(201).json(mark);
-  } catch (error) {
-    next(error);
-  }
 };
 
-// @desc    Add multiple marks in bulk
-// @route   POST /api/marks/bulk
-// @access  Private (Staff/Admin)
-export const addBulkMarks = async (req, res, next) => {
-  try {
-    const { marks } = req.body;
-
-    if (!Array.isArray(marks) || marks.length === 0) {
-      const error = new Error('Please provide an array of marks');
-      error.status = 400;
-      throw error;
+// Get all classes for mark entry
+export const getClasses = async (req, res, next) => {
+    try {
+        const classes = await Student.distinct('class');
+        
+        res.status(200).json({
+            success: true,
+            data: classes
+        });
+    } catch (error) {
+        next(error);
     }
+};
 
-    const createdMarks = [];
-    const errors = [];
+// Get students by class
+export const getStudentsByClass = async (req, res, next) => {
+    try {
+        const { classId } = req.params;
+        
+        let query = {};
+        if (classId !== 'all') {
+            query = { class: classId };
+        }
+        
+        const students = await Student.find(query)
+            .select('name admissionNumber')
+            .sort('admissionNumber');
+        
+        if (!students || students.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'No students found'
+            });
+        }
+        
+        res.status(200).json({
+            success: true,
+            data: students
+        });
+    } catch (error) {
+        next(error);
+    }
+};
 
-    // Process each mark entry
-    for (const markData of marks) {
-      try {
+// Add marks for a student
+export const addMarks = async (req, res) => {
+    try {
+        const { studentName, indexNumber, class: className, term, subjects, academicYear } = req.body;
+
         // Validate required fields
-        const { studentName, admissionNumber, subject, class: className, examType, score, totalMarks } = markData;
-
-        if (!studentName || !admissionNumber || !subject || !className || !examType || score === undefined) {
-          errors.push({ subject, error: 'Missing required fields' });
-          continue;
+        if (!studentName || !indexNumber || !className || !term || !subjects) {
+            return res.status(400).json({
+                success: false,
+                message: 'Missing required fields',
+                required: ['studentName', 'indexNumber', 'class', 'term', 'subjects']
+            });
         }
 
-        // Find student by admission number or studentId
-        const studentUser = await User.findOne({ 
-          $or: [
-            { admissionNumber },
-            { studentId: admissionNumber }
-          ],
-          role: 'student',
-          status: { $ne: 'inactive' }
-        }).select('name admissionNumber studentId class');
-
-        if (!studentUser) {
-          console.error('Student validation failed:', {
-            admissionNumber,
-            subject,
-            className
-          });
-          errors.push({ 
-            subject, 
-            error: `Student not found with admission number: ${admissionNumber}`
-          });
-          continue;
+        // Validate term
+        if (!['Term 1', 'Term 2', 'Term 3'].includes(term)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid term. Must be one of: Term 1, Term 2, Term 3'
+            });
         }
 
-        // Validate student belongs to the specified class
-        if (studentUser.class !== className) {
-          console.error('Class mismatch:', {
-            admissionNumber,
-            studentClass: studentUser.class,
-            providedClass: className
-          });
-          errors.push({ 
-            subject, 
-            error: `Student does not belong to class ${className}`
-          });
-          continue;
+        // Validate class format
+        const classRegex = /^(Grade-\d{1,2}-[A-F]|A\/L-[a-z-]+)$/i;
+        if (!classRegex.test(className)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid class format. Use Grade-6-A or A/L-stream format'
+            });
         }
 
-        // Validate score is a number and within range
-        const numericScore = Number(score);
-        if (isNaN(numericScore) || numericScore < 0 || numericScore > 100) {
-          errors.push({ subject, error: 'Invalid score (must be between 0 and 100)' });
-          continue;
+        // Validate subjects array
+        if (!Array.isArray(subjects) || subjects.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Subjects must be a non-empty array'
+            });
         }
 
-        // Calculate grade based on score
-        let grade = 'F';
-        if (numericScore >= 75) grade = 'A';
-        else if (numericScore >= 65) grade = 'B';
-        else if (numericScore >= 55) grade = 'C';
-        else if (numericScore >= 35) grade = 'S';
+        // Validate each subject entry
+        for (const subject of subjects) {
+            if (!subject.subject || typeof subject.marks !== 'number' || subject.marks < 0 || subject.marks > 100) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Each subject must have a name and marks between 0 and 100'
+                });
+            }
+        }
 
-        // Create or update mark
-        const mark = await Mark.findOneAndUpdate(
-          { student: studentUser._id, subject, examType },
-          {
-            student: studentUser._id,
-            subject,
+        // Check if marks already exist for this student and term
+        const existingMarks = await Mark.findOne({
+            'student.name': studentName,
+            'student.indexNumber': indexNumber,
+            term,
+            academicYear
+        });
+
+        if (existingMarks) {
+            return res.status(400).json({
+                success: false,
+                message: 'Marks already exist for this student and term'
+            });
+        }
+
+        // Create new mark entry
+        const newMark = await Mark.create({
+            student: {
+                name: studentName,
+                indexNumber: indexNumber
+            },
             class: className,
-            examType,
-            score: numericScore,
-            totalMarks: Number(totalMarks || 100),
-            grade,
-            remarks: markData.remarks || `${grade} grade in ${subject}`,
-            markedBy: req.user._id
-          },
-          { 
-            new: true, 
-            upsert: true, 
-            runValidators: true,
-            setDefaultsOnInsert: true
-          }
-        ).populate('student', 'name admissionNumber class')
-          .populate('markedBy', 'name');
-
-        createdMarks.push(mark);
-      } catch (error) {
-        console.error('Error creating mark:', {
-          error,
-          markData,
-          stack: error.stack
+            term,
+            subjects,
+            academicYear,
+            addedBy: req.user._id
         });
-        errors.push({ 
-          subject: markData.subject, 
-          error: error.message || 'Failed to save mark'
+
+        await newMark.populate('addedBy', 'name');
+
+        res.status(201).json({
+            success: true,
+            data: newMark
         });
-      }
+    } catch (error) {
+        console.error('Error adding marks:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Error adding marks'
+        });
     }
-
-    // Log the results
-    console.log('Bulk marks creation results:', {
-      totalMarks: marks.length,
-      createdMarks: createdMarks.length,
-      errors: errors.length,
-      errorDetails: errors
-    });
-
-    if (errors.length > 0) {
-      const errorMessage = errors.map(err => `${err.subject}: ${err.error}`).join(', ');
-      const error = new Error(`Some marks failed to save: ${errorMessage}`);
-      error.status = 400;
-      error.errors = errors;
-      throw error;
-    }
-
-    res.status(201).json({
-      success: true,
-      data: createdMarks
-    });
-  } catch (error) {
-    next(error);
-  }
 };
 
-// @desc    Get marks (with filters)
-// @route   GET /api/marks
-// @access  Private
-export const getMarks = async (req, res, next) => {
-  try {
-    console.log('Debug - Request received:', {
-      query: req.query,
-      user: {
-        id: req.user?._id,
-        role: req.user?.role
-      },
-      headers: req.headers
-    });
+// Get student marks
+export const getStudentMarks = async (req, res, next) => {
+    try {
+        const { studentId } = req.params;
+        
+        // If the user is a student, they can only access their own marks
+        if (req.user.role === 'student' && req.user._id.toString() !== studentId) {
+            return res.status(403).json({
+                success: false,
+                message: 'Not authorized to access these marks'
+            });
+        }
 
-    const { student, subject, examType, class: className } = req.query;
-    
-    // Build filter object
-    const filter = {};
-    if (student) filter.student = student;
-    if (subject) filter.subject = subject;
-    if (examType) filter.examType = examType;
-    if (className) filter.class = className;
+        // Find marks for the student
+        const marks = await Mark.find({ 'student.indexNumber': studentId })
+            .populate('addedBy', 'name')
+            .sort('-createdAt');
+        
+        if (!marks || marks.length === 0) {
+            return res.status(200).json({
+                success: true,
+                data: [],
+                message: 'No marks found for this student'
+            });
+        }
 
-    // If user is a student, only show their marks
-    if (req.user?.role === 'student') {
-      filter.student = req.user._id;
+        res.status(200).json({
+            success: true,
+            data: marks
+        });
+    } catch (error) {
+        console.error('Error fetching student marks:', error);
+        next(error);
     }
-
-    console.log('Debug - Applied filters:', filter);
-
-    // Get total count of marks for debugging
-    const totalMarks = await Mark.countDocuments({});
-    console.log('Debug - Total marks in database:', totalMarks);
-
-    // Get filtered marks
-    const marks = await Mark.find(filter)
-      .populate({
-        path: 'student',
-        select: 'name admissionNumber class role',
-        match: { role: 'student' }
-      })
-      .populate('markedBy', 'name')
-      .sort({ createdAt: -1 });
-
-    console.log('Debug - Query results:', {
-      totalFound: marks.length,
-      hasResults: marks.length > 0,
-      sampleMark: marks[0] ? {
-        id: marks[0]._id,
-        student: marks[0].student?._id,
-        subject: marks[0].subject,
-        class: marks[0].class
-      } : null
-    });
-
-    // Filter out marks with invalid student references
-    const validMarks = marks.filter(mark => mark.student);
-
-    console.log('Debug - Valid marks:', {
-      total: validMarks.length,
-      sample: validMarks[0] ? {
-        id: validMarks[0]._id,
-        student: validMarks[0].student?._id,
-        subject: validMarks[0].subject,
-        class: validMarks[0].class
-      } : null
-    });
-
-    res.json(validMarks);
-  } catch (error) {
-    console.error('Error in getMarks:', {
-      error: error.message,
-      stack: error.stack,
-      query: req.query,
-      user: req.user?._id
-    });
-    next(error);
-  }
 };
 
-// @desc    Get student report card
-// @route   GET /api/marks/report/:studentId
-// @access  Private
-export const getReportCard = async (req, res, next) => {
-  try {
-    const studentId = req.params.studentId;
+// Update marks
+export const updateMarks = async (req, res) => {
+    try {
+        const { markId } = req.params;
+        const { subjects } = req.body;
 
-    // If user is a student, they can only view their own report
-    if (req.user.role === 'student' && req.user._id.toString() !== studentId) {
-      const error = new Error('Not authorized to view this report card');
-      error.status = 403;
-      throw error;
+        // Validate subjects array
+        if (!Array.isArray(subjects) || subjects.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Subjects must be a non-empty array'
+            });
+        }
+
+        // Validate each subject entry
+        for (const subject of subjects) {
+            if (!subject.subject || typeof subject.marks !== 'number' || subject.marks < 0 || subject.marks > 100) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Each subject must have a name and marks between 0 and 100'
+                });
+            }
+        }
+
+        const mark = await Mark.findByIdAndUpdate(
+            markId,
+            { subjects },
+            { new: true, runValidators: true }
+        ).populate('addedBy', 'name');
+
+        if (!mark) {
+            return res.status(404).json({
+                success: false,
+                message: 'Mark not found'
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            data: mark
+        });
+    } catch (error) {
+        console.error('Error updating marks:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Error updating marks'
+        });
     }
-
-    const student = await User.findOne({ _id: studentId, role: 'student' });
-    if (!student) {
-      const error = new Error('Student not found');
-      error.status = 404;
-      throw error;
-    }
-
-    const marks = await Mark.find({ student: studentId })
-      .populate('student', 'name admissionNumber class')
-      .populate('markedBy', 'name')
-      .sort({ subject: 1, examType: 1 });
-
-    // Calculate statistics
-    const reportCard = {
-      student: {
-        name: student.name,
-        admissionNumber: student.admissionNumber,
-        class: student.class
-      },
-      terms: {},
-      overall: {
-        totalScore: 0,
-        averageScore: 0,
-        subjects: 0,
-        gradeDistribution: { A: 0, B: 0, C: 0, S: 0, F: 0 }
-      }
-    };
-
-    marks.forEach(mark => {
-      // Initialize term if not exists
-      if (!reportCard.terms[mark.examType]) {
-        reportCard.terms[mark.examType] = {
-          totalScore: 0,
-          averageScore: 0,
-          subjects: 0,
-          gradeDistribution: { A: 0, B: 0, C: 0, S: 0, F: 0 }
-        };
-      }
-
-      // Update term statistics
-      reportCard.terms[mark.examType].totalScore += mark.score;
-      reportCard.terms[mark.examType].subjects += 1;
-      reportCard.terms[mark.examType].gradeDistribution[mark.grade] += 1;
-
-      // Update overall statistics
-      reportCard.overall.totalScore += mark.score;
-      reportCard.overall.subjects += 1;
-      reportCard.overall.gradeDistribution[mark.grade] += 1;
-    });
-
-    // Calculate averages
-    Object.keys(reportCard.terms).forEach(term => {
-      reportCard.terms[term].averageScore = 
-        reportCard.terms[term].totalScore / reportCard.terms[term].subjects;
-    });
-
-    reportCard.overall.averageScore = 
-      reportCard.overall.totalScore / reportCard.overall.subjects;
-
-    // Add marks details
-    reportCard.marks = marks;
-
-    res.json(reportCard);
-  } catch (error) {
-    next(error);
-  }
 };
 
-// @desc    Delete marks
-// @route   DELETE /api/marks/:id
-// @access  Private (Staff/Admin)
-export const deleteMarks = async (req, res, next) => {
-  try {
-    const mark = await Mark.findById(req.params.id);
+// Delete marks
+export const deleteMarks = async (req, res) => {
+    try {
+        const { markId } = req.params;
 
-    if (!mark) {
-      const error = new Error('Marks not found');
-      error.status = 404;
-      throw error;
+        const mark = await Mark.findByIdAndDelete(markId);
+
+        if (!mark) {
+            return res.status(404).json({
+                success: false,
+                message: 'Mark not found'
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: 'Mark deleted successfully'
+        });
+    } catch (error) {
+        console.error('Error deleting marks:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Error deleting marks'
+        });
     }
-
-    // Verify marker or admin status
-    if (mark.markedBy.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
-      const error = new Error('Not authorized to delete these marks');
-      error.status = 403;
-      throw error;
-    }
-
-    await mark.deleteOne();
-    res.json({ message: 'Marks deleted successfully' });
-  } catch (error) {
-    next(error);
-  }
-}; 
+};

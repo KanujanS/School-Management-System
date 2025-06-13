@@ -22,7 +22,7 @@ import {
   ListItemText,
   Divider
 } from '@mui/material';
-import { Add as AddIcon, Delete as DeleteIcon, Visibility as VisibilityIcon } from '@mui/icons-material';
+import { Add as AddIcon, Delete as DeleteIcon, Visibility as VisibilityIcon, Close as CloseIcon } from '@mui/icons-material';
 import { attendanceAPI } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import AddAttendance from '../../components/AddAttendance';
@@ -75,7 +75,19 @@ const Attendance = () => {
   const handleDeleteConfirm = async () => {
     try {
       setDeleting(true);
+      
+      // Check if we have a selected record
+      if (!selectedRecord || !selectedRecord._id) {
+        throw new Error('No attendance record selected');
+      }
+
+      // Check if user is authenticated
+      if (!user || !user._id) {
+        throw new Error('You must be logged in to delete attendance records');
+      }
+
       const response = await attendanceAPI.delete(selectedRecord._id);
+      
       if (response.success) {
         // Remove the deleted record from the state
         setAttendanceRecords(prev => prev.filter(record => record._id !== selectedRecord._id));
@@ -85,7 +97,14 @@ const Attendance = () => {
       }
     } catch (error) {
       console.error('Error deleting attendance record:', error);
-      toast.error(error.message || 'Failed to delete attendance record');
+      // Show more specific error messages
+      let errorMessage = 'Failed to delete attendance record';
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      toast.error(errorMessage);
     } finally {
       setDeleting(false);
       setDeleteDialogOpen(false);
@@ -99,6 +118,7 @@ const Attendance = () => {
   };
 
   const handleViewClick = (record) => {
+    console.log('Debug - Viewing attendance record:', record);
     setSelectedRecord(record);
     setViewDialogOpen(true);
   };
@@ -239,20 +259,65 @@ const Attendance = () => {
         </TableContainer>
       )}
 
-      {/* Add Attendance Modal */}
-      {showAddModal && (
-        <Dialog
-          open={showAddModal}
-          onClose={() => setShowAddModal(false)}
-          maxWidth="md"
-          fullWidth
-        >
-          <AddAttendance
-            onClose={() => setShowAddModal(false)}
-            onSuccess={handleAddSuccess}
-          />
-        </Dialog>
-      )}
+      {/* View Dialog */}
+      <Dialog
+        open={viewDialogOpen}
+        onClose={handleViewClose}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box display="flex" justifyContent="space-between" alignItems="center">
+            <Typography variant="h6">
+              Attendance Details - {selectedRecord?.class}
+            </Typography>
+            <IconButton onClick={handleViewClose} size="small">
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Box mb={2}>
+            <Typography variant="subtitle1" color="textSecondary">
+              Date: {selectedRecord && new Date(selectedRecord.date).toLocaleDateString()}
+            </Typography>
+          </Box>
+          <TableContainer>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Student Name</TableCell>
+                  <TableCell>Admission Number</TableCell>
+                  <TableCell align="center">Status</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {selectedRecord?.students.map((student) => {
+                  console.log('Debug - Student data:', student);
+                  return (
+                    <TableRow key={student._id || student.student?._id}>
+  <TableCell>{student.name || student.student?.name}</TableCell>
+  <TableCell>{student.admissionNumber || student.student?.admissionNumber}</TableCell>
+  <TableCell align="center">
+    <Chip
+      label={(student.status || student?.status)?.charAt(0).toUpperCase() + (student.status || student?.status)?.slice(1)}
+      color={getStatusColor(student.status)}
+      size="small"
+    />
+  </TableCell>
+</TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleViewClose} color="primary">
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Delete Confirmation Dialog */}
       <Dialog
@@ -262,7 +327,7 @@ const Attendance = () => {
         <DialogTitle>Delete Attendance Record</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Are you sure you want to delete the attendance record for {selectedRecord?.class} on {selectedRecord ? new Date(selectedRecord.date).toLocaleDateString() : ''}? This action cannot be undone.
+            Are you sure you want to delete this attendance record? This action cannot be undone.
           </DialogContentText>
         </DialogContent>
         <DialogActions>
@@ -272,7 +337,6 @@ const Attendance = () => {
           <Button 
             onClick={handleDeleteConfirm} 
             color="error" 
-            variant="contained"
             disabled={deleting}
           >
             {deleting ? 'Deleting...' : 'Delete'}
@@ -280,97 +344,13 @@ const Attendance = () => {
         </DialogActions>
       </Dialog>
 
-      {/* View Attendance Details Dialog */}
-      <Dialog
-        open={viewDialogOpen}
-        onClose={handleViewClose}
-        maxWidth="md"
-        fullWidth
-      >
-        <DialogTitle>
-          Attendance Details - {selectedRecord?.class}
-          <Typography variant="subtitle2" color="text.secondary">
-            {selectedRecord ? new Date(selectedRecord.date).toLocaleDateString() : ''}
-          </Typography>
-        </DialogTitle>
-        <DialogContent>
-          {selectedRecord && (
-            <Box>
-              <Box mb={2}>
-                <Typography variant="subtitle1" gutterBottom>
-                  Summary
-                </Typography>
-                <Box display="flex" gap={2}>
-                  <Chip
-                    label={`Present: ${selectedRecord.students.filter(s => s.status === 'present').length}`}
-                    color="success"
-                  />
-                  <Chip
-                    label={`Absent: ${selectedRecord.students.filter(s => s.status === 'absent').length}`}
-                    color="error"
-                  />
-                </Box>
-              </Box>
-              
-              <Divider sx={{ my: 2 }} />
-              
-              <Typography variant="subtitle1" gutterBottom>
-                Student Details
-              </Typography>
-              <List>
-                {selectedRecord.students.map((student, index) => {
-                  // Safely access student data
-                  const studentData = student.student || {};
-                  const studentName = studentData.name || 'Unknown Student';
-                  const studentId = studentData.admissionNumber || 'N/A';
-                  const status = student.status || 'unknown';
-                  
-                  return (
-                    <React.Fragment key={studentData._id || index}>
-                      <ListItem>
-                        <ListItemText
-                          primary={
-                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                              <Typography component="span" variant="body1" sx={{ fontWeight: 500 }}>
-                                {studentName}
-                              </Typography>
-                              <Typography 
-                                component="span" 
-                                variant="body2" 
-                                color="text.secondary" 
-                                sx={{ ml: 2 }}
-                              >
-                                ID: {studentId}
-                              </Typography>
-                            </Box>
-                          }
-                          secondary={
-                            <Typography variant="body2" sx={{ mt: 0.5 }}>
-                              Status: {status.charAt(0).toUpperCase() + status.slice(1)}
-                            </Typography>
-                          }
-                        />
-                        <Chip
-                          size="small"
-                          color={status === 'present' ? 'success' : 'error'}
-                          label={status.charAt(0).toUpperCase() + status.slice(1)}
-                          sx={{ ml: 2 }}
-                        />
-                      </ListItem>
-                      {index < selectedRecord.students.length - 1 && <Divider />}
-                    </React.Fragment>
-                  );
-                })}
-              </List>
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleViewClose}>
-            Close
-          </Button>
-        </DialogActions>
-      </Dialog>
+      {/* Add Attendance Modal */}
+      {showAddModal && (
+        <AddAttendance
+          onClose={() => setShowAddModal(false)}
+          onSuccess={handleAddSuccess}
+        />
+      )}
     </Box>
   );
 };

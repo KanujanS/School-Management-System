@@ -1,486 +1,340 @@
-import React, { useState, useEffect } from 'react';
-import { XMarkIcon } from '@heroicons/react/24/outline';
-import { userAPI } from '../services/api';
-import toast from 'react-hot-toast';
+import React, { useState, useEffect } from "react";
+import { CircularProgress } from "@mui/material";
+import { marksAPI } from "../services/api";
+import toast from "react-hot-toast";
 
-const AddMarks = ({ onClose, onAdd, selectedClass }) => {
+const AddMarks = ({ onClose, onAdd, selectedClass: initialClass }) => {
   const [formData, setFormData] = useState({
-    studentName: '',
-    studentId: '',
-    class: selectedClass || '',
-    term: '',
+    class: initialClass || "",
+    term: "",
+    studentName: "",
+    indexNumber: ""
   });
 
-  const [students, setStudents] = useState([]);
-  const [filteredStudents, setFilteredStudents] = useState([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [showStudentDropdown, setShowStudentDropdown] = useState(false);
   const [subjectMarks, setSubjectMarks] = useState([]);
   const [availableSubjects, setAvailableSubjects] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // Predefined list of all classes
-  const allClasses = [
-    // O/L Classes (Grade 6-11)
-    ...[6, 7, 8, 9, 10, 11].flatMap(grade => 
-      ['A', 'B', 'C', 'D', 'E', 'F'].map(division => `Grade-${grade}-${division}`)
-    ),
-    // A/L Classes with detailed streams
-    'A/L-Physical-Science',
-    'A/L-Biological-Science',
-    'A/L-Bio-Technology',
-    'A/L-Engineering-Technology',
-    'A/L-Commerce',
-    'A/L-Arts'
-  ];
+  useEffect(() => {
+    if (formData.class) {
+      updateAvailableSubjects();
+    }
+  }, [formData.class]);
 
   // Predefined list of subjects by category
   const subjects = {
     ordinaryLevel: [
-      'Sinhala',
-      'English Language',
-      'Mathematics',
-      'Science',
-      'History',
-      'Buddhism',
-      'Hinduism',
-      'Islam',
-      'Christianity',
-      'Geography',
-      'Civic Education',
-      'Business and Accounting Studies',
-      'Information and Communication Technology',
-      'Agriculture and Food Technology',
-      'Health and Physical Education',
-      'Second Language Tamil',
-      'Aesthetic Studies - Art',
-      'Aesthetic Studies - Music',
-      'Aesthetic Studies - Dance',
-      'Aesthetic Studies - Drama'
+      "Sinhala",
+      "English Language",
+      "Mathematics",
+      "Science",
+      "History",
+      "Buddhism",
+      "Hinduism",
+      "Islam",
+      "Christianity",
+      "Geography",
+      "Civic Education",
+      "Business and Accounting Studies",
+      "Information and Communication Technology",
+      "Agriculture and Food Technology",
+      "Health and Physical Education",
+      "Second Language Tamil",
+      "Aesthetic Studies - Art",
+      "Aesthetic Studies - Music",
+      "Aesthetic Studies - Dance",
+      "Aesthetic Studies - Drama",
     ],
-    alPhysicalScience: [
-      'Physics',
-      'Chemistry',
-      'Combined Mathematics',
-      'Information Technology',
-      'General English'
+    physicalscience: [
+      "Physics",
+      "Chemistry",
+      "Combined Mathematics",
+      "Information Technology",
+      "General English",
     ],
-    alBiologicalScience: [
-      'Biology',
-      'Physics',
-      'Chemistry',
-      'Information Technology',
-      'General English'
+    biologicalscience: [
+      "Biology",
+      "Physics",
+      "Chemistry",
+      "Information Technology",
+      "General English",
     ],
-    alBioTechnology: [
-      'Biology',
-      'Science for Technology',
-      'Engineering Technology',
-      'Information Technology',
-      'General English'
+    biotechnology: [
+      "Biology",
+      "Science for Technology",
+      "Engineering Technology",
+      "Information Technology",
+      "General English",
     ],
-    alEngineeringTechnology: [
-      'Engineering Technology',
-      'Science for Technology',
-      'Information Technology',
-      'General English'
+    engineeringtechnology: [
+      "Engineering Technology",
+      "Science for Technology",
+      "Information Technology",
+      "General English",
     ],
-    alCommerce: [
-      'Business Studies',
-      'Accounting',
-      'Economics',
-      'Information Technology',
-      'General English'
+    commerce: [
+      "Business Studies",
+      "Accounting",
+      "Economics",
+      "Information Technology",
+      "General English",
     ],
-    alArts: [
-      'Logic and Scientific Method',
-      'Geography',
-      'Political Science',
-      'Economics',
-      'History',
-      'Information Technology',
-      'General English'
-    ]
+    arts: [
+      "Logic and Scientific Method",
+      "Geography",
+      "Political Science",
+      "Economics",
+      "History",
+      "Information Technology",
+      "General English",
+    ],
   };
 
   // Terms
-  const terms = ['Term 1', 'Term 2', 'Term 3'];
+  const terms = ["Term 1", "Term 2", "Term 3"];
 
   useEffect(() => {
-    // Update available subjects when class changes
-    const selectedClass = formData.class;
-    let newSubjects = [];
-    
-    if (selectedClass.startsWith('Grade')) {
-      newSubjects = subjects.ordinaryLevel;
-    } else if (selectedClass === 'A/L-Physical-Science') {
-      newSubjects = subjects.alPhysicalScience;
-    } else if (selectedClass === 'A/L-Biological-Science') {
-      newSubjects = subjects.alBiologicalScience;
-    } else if (selectedClass === 'A/L-Bio-Technology') {
-      newSubjects = subjects.alBioTechnology;
-    } else if (selectedClass === 'A/L-Engineering-Technology') {
-      newSubjects = subjects.alEngineeringTechnology;
-    } else if (selectedClass === 'A/L-Commerce') {
-      newSubjects = subjects.alCommerce;
-    } else if (selectedClass === 'A/L-Arts') {
-      newSubjects = subjects.alArts;
+    if (formData.class) {
+      updateAvailableSubjects();
     }
-
-    setAvailableSubjects(newSubjects);
-    
-    // Initialize subject marks array with empty values
-    setSubjectMarks(newSubjects.map(subject => ({
-      subject,
-      value: '',
-      grade: '',
-      totalMarks: '100',
-      isElective: true // Mark all subjects as elective by default
-    })));
-
-    // Fetch students for the selected class
-    const fetchStudents = async () => {
-      if (!selectedClass) {
-        setStudents([]);
-        setFilteredStudents([]);
-        return;
-      }
-      
-      try {
-        setLoading(true);
-        const students = await userAPI.getStudentsByClass(selectedClass);
-        
-        if (!students || students.length === 0) {
-          toast(`No students found in class ${selectedClass}`, {
-            icon: '⚠️',
-            duration: 4000
-          });
-        }
-
-        setStudents(students);
-      } catch (error) {
-        console.error('Error fetching students:', error);
-        toast.error(error.message || 'Failed to fetch students');
-        setStudents([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchStudents();
   }, [formData.class]);
 
-  // Enhanced student filtering
-  useEffect(() => {
+  // Predefined list of all classes
+  const allClasses = [
+    // O/L Classes (Grade 6-11)
+    ...[6, 7, 8, 9, 10, 11].flatMap((grade) =>
+      ["A", "B", "C", "D", "E", "F"].map(
+        (division) => `Grade-${grade}-${division}`
+      )
+    ),
+    // A/L Classes with detailed streams
+    "A/L-Physical-Science",
+    "A/L-Biological-Science",
+    "A/L-Bio-Technology",
+    "A/L-Engineering-Technology",
+    "A/L-Commerce",
+    "A/L-Arts",
+  ];
+
+  const updateAvailableSubjects = () => {
+    let newSubjects = [];
+
     if (!formData.class) {
-      setStudents([]);
-      setFilteredStudents([]);
+      setAvailableSubjects([]);
       return;
     }
 
-    const fetchStudents = async () => {
-      try {
-        setLoading(true);
-        const students = await userAPI.getStudentsByClass(formData.class);
-        
-        if (!students || students.length === 0) {
-          toast(`No students found in class ${formData.class}`, {
-            icon: '⚠️',
-            duration: 4000
-          });
-        }
-
-        setStudents(students);
-        
-        // If there's a search term, filter immediately
-        if (searchTerm) {
-          const searchTermLower = searchTerm.toLowerCase().trim();
-          const filtered = students.filter(student => {
-            const studentName = student?.name?.toLowerCase() || '';
-            const studentId = student?.admissionNumber?.toLowerCase() || '';
-            return studentName.includes(searchTermLower) || studentId.includes(searchTermLower);
-          });
-          setFilteredStudents(filtered);
-        }
-      } catch (error) {
-        console.error('Error fetching students:', error);
-        toast.error(error.message || 'Failed to fetch students');
-        setStudents([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchStudents();
-  }, [formData.class, searchTerm]);
-
-  // Filter students based on search term
-  useEffect(() => {
-    if (searchTerm) {
-      const filtered = students.filter(student => 
-        student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        student.admissionNumber.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-      setFilteredStudents(filtered);
-    } else {
-      setFilteredStudents(students);
-    }
-  }, [searchTerm, students]);
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    
-    if (name === 'studentName' || name === 'studentId') {
-      setSearchTerm(value);
-      setShowStudentDropdown(true);
-      setFormData(prev => ({ ...prev, [name]: value }));
-    } else {
-      setFormData(prev => ({ ...prev, [name]: value }));
-    }
-  };
-
-  const handleStudentSelect = (student) => {
-    if (!student) return;
-    
-    setFormData(prev => ({
-      ...prev,
-      studentName: `${student.name} (${student.admissionNumber})`,
-      studentId: student.admissionNumber
-    }));
-    setSearchTerm('');
-    setShowStudentDropdown(false);
-  };
-
-  const handleSubjectMarkChange = (index, value) => {
-    setSubjectMarks(prevMarks => {
-      const newMarks = [...prevMarks];
-      newMarks[index] = {
-        ...newMarks[index],
-        value: value,
-        grade: calculateGrade(value)
-      };
-      return newMarks;
-    });
-  };
-
-  const calculateGrade = (marks) => {
-    const numMarks = parseInt(marks);
-    if (isNaN(numMarks)) return '';
-    if (numMarks >= 75) return 'A';
-    if (numMarks >= 65) return 'B';
-    if (numMarks >= 55) return 'C';
-    if (numMarks >= 35) return 'S';
-    return 'F';
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    try {
-      // Filter out subjects with marks entered
-      const validMarks = subjectMarks.filter(mark => mark?.value && mark.value.trim() !== '');
+    if (formData.class.startsWith("A/L-")) {
+      // Remove A/L- prefix and convert to lowercase without hyphens
+      const stream = formData.class
+        .replace("A/L-", "")
+        .toLowerCase()
+        .replace(/-/g, "");
       
-      if (validMarks.length === 0) {
-        toast.error('Please enter marks for at least one subject');
+      console.log('Selected stream:', stream);
+      
+      if (subjects[stream]) {
+        newSubjects = subjects[stream];
+      } else {
+        console.error(`Unknown stream: ${stream}`);
+        toast.error(`Unknown stream: ${stream}`);
+        return;
+      }
+    } else {
+      newSubjects = subjects.ordinaryLevel;
+    }
+
+    setAvailableSubjects(newSubjects);
+  };
+
+  const handleClassChange = (event) => {
+    const newClass = event.target.value;
+    setFormData({ ...formData, class: newClass });
+    if (newClass) {
+      updateAvailableSubjects();
+    }
+  };
+
+  const handleAddMarks = async () => {
+    try {
+      // Validate required fields
+      if (!formData.studentName || !formData.indexNumber || !formData.class || !formData.term) {
+        toast.error('Please fill in all required fields');
         return;
       }
 
-      if (!formData.studentName || !formData.studentId) {
-        toast.error('Please enter both student name and admission number');
+      // Validate subjects
+      if (subjectMarks.length === 0) {
+        toast.error('Please add at least one subject mark');
         return;
       }
 
-      if (!formData.class || !formData.term) {
-        toast.error('Please select both class and term');
-        return;
+      // Validate each subject mark
+      for (const mark of subjectMarks) {
+        if (!mark.subject || typeof mark.marks !== 'number' || mark.marks < 0 || mark.marks > 100) {
+          toast.error('Each subject must have a name and marks between 0 and 100');
+          return;
+        }
       }
 
-      // Create mark entries for subjects with values
-      const markEntries = validMarks.map(mark => ({
-        studentName: formData.studentName,
-        admissionNumber: formData.studentId,
-        subject: mark.subject,
-        score: Number(mark.value),
-        totalMarks: Number(mark.totalMarks || 100),
-        examType: formData.term,
-        class: formData.class,
-        grade: calculateGrade(mark.value),
-        remarks: `${calculateGrade(mark.value)} grade in ${mark.subject}`
-      }));
+      setLoading(true);
+      
+      // Prepare the marks data in the expected format
+      const marksData = {
+        studentName: formData.studentName.trim(),
+        indexNumber: formData.indexNumber.trim(),
+        class: formData.class.replace(/\s+/g, '-'),  // Normalize class name
+        term: formData.term,
+        subjects: subjectMarks.map(mark => ({
+          subject: mark.subject,
+          marks: Number(mark.marks),
+          totalMarks: 100
+        })),
+        academicYear: new Date().getFullYear().toString()
+      };
 
-      await onAdd({ marks: markEntries });
-      toast.success('Marks added successfully');
-      onClose();
+      const response = await marksAPI.create(marksData);
+      
+      if (response.success) {
+        toast.success('Marks added successfully');
+        onAdd(response.data);
+        onClose();
+      } else {
+        throw new Error(response.message || 'Failed to add marks');
+      }
     } catch (error) {
       console.error('Error adding marks:', error);
       toast.error(error.message || 'Failed to add marks');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-50">
-      <div className="fixed inset-0 bg-gradient-to-br from-red-50/90 via-red-100/90 to-gray-100/90 backdrop-blur-sm"></div>
-      
-      <div className={`relative w-full mx-4 bg-white rounded-lg shadow-xl flex flex-col ${subjectMarks.length > 0 ? 'max-w-5xl h-[90vh]' : 'max-w-3xl'}`}>
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">Add Student Marks</h3>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
-            <XMarkIcon className="h-6 w-6" />
-          </button>
+    <div className="fixed top-0 left-0 right-0 bottom-0 bg-opacity-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-lg w-full max-w-md sm:max-w-2xl p-4 sm:p-6 m-2 sm:m-4 h-[90vh] sm:h-[80vh] flex flex-col">
+        <div className="flex-0">
+          <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">Add Marks</h2>
         </div>
-        
-        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-          <div className="p-6 space-y-6 flex-1 overflow-y-auto">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Class</label>
-                <select
-                  name="class"
-                  value={formData.class}
-                  onChange={handleChange}
-                  required
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-900 focus:ring-red-900 sm:text-sm"
-                >
-                  <option value="">Select Class</option>
-                  <optgroup label="Ordinary Level">
-                    {allClasses
-                      .filter(className => className.startsWith('Grade'))
-                      .map(className => (
-                        <option key={className} value={className}>
-                          {className.replace(/-/g, ' ')}
-                        </option>
-                      ))}
-                  </optgroup>
-                  <optgroup label="Advanced Level">
-                    {allClasses
-                      .filter(className => className.startsWith('A/L'))
-                      .map(className => (
-                        <option key={className} value={className}>
-                          {className.replace(/-/g, ' ')}
-                        </option>
-                      ))}
-                  </optgroup>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Term</label>
-                <select
-                  name="term"
-                  value={formData.term}
-                  onChange={handleChange}
-                  required
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-900 focus:ring-red-900 sm:text-sm"
-                >
-                  <option value="">Select Term</option>
-                  {terms.map(term => (
-                    <option key={term} value={term}>{term}</option>
-                  ))}
-                </select>
-              </div>
+        <div className="flex-1 overflow-y-auto">
+          <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Class</label>
+              <select
+                value={formData.class}
+                onChange={handleClassChange}
+                className="w-full px-3 py-2 border rounded-lg border-gray-300 focus:outline-none focus:ring-2 focus:ring-red-500"
+                required
+              >
+                <option value="">Select class</option>
+                {allClasses.map((className) => (
+                  <option key={className} value={className}>
+                    {className}
+                  </option>
+                ))}
+              </select>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Student Name</label>
-                <input
-                  type="text"
-                  name="studentName"
-                  value={formData.studentName}
-                  onChange={handleChange}
-                  required
-                  placeholder="Enter student name"
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-900 focus:ring-red-900 sm:text-sm"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Admission Number</label>
-                <input
-                  type="text"
-                  name="studentId"
-                  value={formData.studentId}
-                  onChange={handleChange}
-                  required
-                  placeholder="Enter admission number"
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-900 focus:ring-red-900 sm:text-sm"
-                />
-              </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Term</label>
+              <select
+                value={formData.term}
+                onChange={(e) => setFormData({ ...formData, term: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg border-gray-300 focus:outline-none focus:ring-2 focus:ring-red-500"
+                required
+              >
+                <option value="">Select term</option>
+                {terms.map((term) => (
+                  <option key={term} value={term}>
+                    {term}
+                  </option>
+                ))}
+              </select>
             </div>
 
-            {formData.studentId && (
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h4 className="text-sm font-medium text-gray-700 mb-2">Selected Student Details</h4>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs text-gray-500">Name</label>
-                    <div className="text-sm font-medium">{formData.studentName.split(' (')[0]}</div>
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-500">Admission Number</label>
-                    <div className="text-sm font-medium">{formData.studentId}</div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Student Name</label>
+              <input
+                type="text"
+                value={formData.studentName}
+                onChange={(e) => setFormData({ ...formData, studentName: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg border-gray-300 focus:outline-none focus:ring-2 focus:ring-red-500"
+                required
+                placeholder="Enter student name"
+              />
+            </div>
 
-          {subjectMarks.length > 0 && (
-            <div className="flex-1 overflow-hidden">
-              <div className="p-6 border-t border-gray-200">
-                <div className="flex justify-between items-center mb-4">
-                  <h4 className="text-sm font-medium text-gray-900">Enter Marks for Subjects</h4>
-                  <div className="text-xs text-gray-500">* All subjects are optional</div>
-                </div>
-                <div className="overflow-y-auto max-h-[calc(90vh-24rem)] pr-2">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {subjectMarks.map((mark, index) => (
-                      <div key={mark.subject} className="flex items-center space-x-4 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                        <div className="flex-1">
-                          <label className="block text-sm font-medium text-gray-700">
-                            {mark.subject}
-                          </label>
-                          <div className="mt-1 flex space-x-2">
-                            <input
-                              type="number"
-                              value={mark.value}
-                              onChange={(e) => handleSubjectMarkChange(index, e.target.value)}
-                              min="0"
-                              max="100"
-                              placeholder="Optional"
-                              className="block w-24 rounded-md border-gray-300 shadow-sm focus:border-red-900 focus:ring-red-900 sm:text-sm"
-                            />
-                            {mark.value && (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                Grade: {mark.grade || '-'}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Index Number</label>
+              <input
+                type="text"
+                value={formData.indexNumber}
+                onChange={(e) => setFormData({ ...formData, indexNumber: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg border-gray-300 focus:outline-none focus:ring-2 focus:ring-red-500"
+                required
+                placeholder="Enter index number"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">Subjects</label>
+              <div className="space-y-2">
+                {availableSubjects.length > 0 ? (
+                  availableSubjects.map((subject) => (
+                    <div key={subject} className="flex items-center space-x-2">
+                      <input
+                        type="number"
+                        placeholder="Marks"
+                        min="0"
+                        max="100"
+                        className="w-24 sm:w-32 px-2 py-1 border rounded-lg border-gray-300 focus:outline-none focus:ring-2 focus:ring-red-500"
+                        onChange={(e) => {
+                          const marks = [...subjectMarks];
+                          const index = marks.findIndex((m) => m.subject === subject);
+                          if (index !== -1) {
+                            marks[index] = { ...marks[index], marks: parseInt(e.target.value) };
+                          } else {
+                            marks.push({ subject, marks: parseInt(e.target.value) });
+                          }
+                          setSubjectMarks(marks);
+                        }}
+                      />
+                      <span>{subject}</span>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-gray-500">Select a class to view subjects</p>
+                )}
               </div>
             </div>
-          )}
-
-          <div className="flex justify-end space-x-3 p-6 border-t border-gray-200 bg-gray-50">
+          </form>
+        </div>
+        <div className="flex-0 mt-4">
+          <div className="flex justify-end space-x-4">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+              className="px-4 py-2 text-gray-600 hover:text-gray-800 rounded-lg transition-colors"
             >
               Cancel
             </button>
             <button
-              type="submit"
-              className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-900 hover:bg-red-800"
+              type="button"
+              onClick={handleAddMarks}
+              disabled={loading}
+              className="px-4 py-2 bg-red-800 text-white rounded-lg hover:bg-red-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Add Marks
+              {loading ? (
+                <span className="flex items-center">
+                  <CircularProgress size={20} className="mr-2" />
+                  Adding...
+                </span>
+              ) : (
+                'Add Marks'
+              )}
             </button>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   );

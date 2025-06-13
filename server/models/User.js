@@ -52,6 +52,16 @@ const userSchema = new mongoose.Schema({
     sparse: true,
     required: function() {
       return this.role === 'student';
+    },
+    validate: {
+      validator: function(v) {
+        if (!v) return false;
+        v = v.trim();
+        // For O/L students: 4-digit number (e.g., 6001)
+        // For A/L students: subject code + 3 digits (e.g., PS001, AR001)
+        return /^\d{4}$/.test(v) || /^(PS|BS|AR|CM|ET|BT)\d{3}$/.test(v);
+      },
+      message: props => `${props.value} is not a valid student ID format! Use 4 digits for O/L or [SubjectCode][3 digits] for A/L`
     }
   },
   admissionNumber: {
@@ -60,6 +70,16 @@ const userSchema = new mongoose.Schema({
     sparse: true,
     required: function() {
       return this.role === 'student';
+    },
+    validate: {
+      validator: function(v) {
+        if (!v) return false;
+        v = v.trim();
+        // For O/L students: 4-digit number (e.g., 6001)
+        // For A/L students: subject code + 3 digits (e.g., PS001, AR001)
+        return /^\d{4}$/.test(v) || /^(PS|BS|AR|CM|ET|BT)\d{3}$/.test(v);
+      },
+      message: props => `${props.value} is not a valid admission number format! Use 4 digits for O/L or [SubjectCode][3 digits] for A/L`
     }
   },
   class: {

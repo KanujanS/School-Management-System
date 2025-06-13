@@ -6,7 +6,6 @@ import {
   AcademicCapIcon,
   UserCircleIcon,
   BookOpenIcon,
-  BellIcon
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
@@ -22,24 +21,26 @@ const StudentDashboard = () => {
         setIsLoading(true);
         
         // Fetch assignments and marks data
-        const [assignmentsResponse, marksResponse] = await Promise.all([
-          assignmentsAPI.getAll({ studentId: user._id }),
-          marksAPI.getAll({ studentId: user._id })
+        const [assignmentsResponse, marksData] = await Promise.all([
+          assignmentsAPI.getAll({ class: user.class }),
+          marksAPI.getStudentMarks(user._id)
         ]);
 
         // Handle assignments response
         if (assignmentsResponse.success) {
-          setAssignments(assignmentsResponse.data || []);
+          const sortedAssignments = (assignmentsResponse.data || [])
+            .sort((a, b) => new Date(b.dueDate) - new Date(a.dueDate));
+          setAssignments(sortedAssignments);
         } else {
           console.error('Error in assignments response:', assignmentsResponse.message);
           setAssignments([]);
         }
 
-        // Handle marks response
-        if (marksResponse.success) {
-          setMarks(marksResponse.data || []);
+        // Handle marks data
+        if (Array.isArray(marksData)) {
+          setMarks(marksData);
         } else {
-          console.error('Error in marks response:', marksResponse.message);
+          console.error('Error in marks response:', marksData);
           setMarks([]);
         }
       } catch (error) {

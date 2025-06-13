@@ -1,32 +1,42 @@
 import express from 'express';
 import { 
-  addMarks,
-  addBulkMarks,
-  getMarks,
-  getReportCard,
-  deleteMarks
+    getClasses, 
+    getStudentsByClass, 
+    addMarks, 
+    updateMarks, 
+    deleteMarks, 
+    getStudentMarks,
+    getAllMarks 
 } from '../controllers/markController.js';
 import { protect, authorize } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-router.use(protect); // Protect all routes
+// Protect all routes
+router.use(protect);
 
-router
-  .route('/')
-  .post(authorize('staff', 'admin'), addMarks)
-  .get(getMarks);
+// Route accessible by all authenticated users (including students)
+router.get('/student/:studentId', getStudentMarks);
 
-router
-  .route('/bulk')
-  .post(authorize('staff', 'admin'), addBulkMarks);
+// Routes accessible by staff and admin only
+router.use(authorize('staff', 'admin'));
 
-router
-  .route('/report/:studentId')
-  .get(getReportCard);
+// Get classes for mark entry
+router.get('/classes', getClasses);
 
-router
-  .route('/:id')
-  .delete(authorize('staff', 'admin'), deleteMarks);
+// Get students by class
+router.get('/students/:classId', getStudentsByClass);
 
-export default router; 
+// Add marks
+router.post('/add', addMarks);
+
+// Update marks
+router.patch('/:markId', updateMarks);
+
+// Delete marks
+router.delete('/:markId', deleteMarks);
+
+// Get all marks
+router.get('/', getAllMarks);
+
+export default router;

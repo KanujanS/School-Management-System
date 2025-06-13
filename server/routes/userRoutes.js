@@ -7,7 +7,8 @@ const router = express.Router();
 // Protected routes
 router.use(protect);
 
-// Get students by class
+// Get students by class (support both query params and URL params)
+router.get('/students', getStudentsByClass);
 router.get('/students/class/:className', getStudentsByClass);
 
 // Add test students (admin only)

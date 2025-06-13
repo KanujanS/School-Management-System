@@ -61,7 +61,7 @@ const AssignmentDetails = ({ assignment, onClose }) => {
 
   return (
     <div className="fixed inset-0 flex items-center justify-center z-50">
-      <div className="fixed inset-0 bg-gradient-to-br from-red-50/90 via-red-100/90 to-gray-100/90 backdrop-blur-sm"></div>
+      <div className="fixed inset-0 bg-black/50"></div>
 
       <div className="relative w-full max-w-2xl p-6 mx-4 bg-white rounded-lg shadow-xl overflow-y-auto max-h-[90vh]">
         <div className="flex items-center justify-between mb-4">
