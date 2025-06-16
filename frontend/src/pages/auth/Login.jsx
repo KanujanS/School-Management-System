@@ -59,12 +59,12 @@ const Login = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8 bg-gradient-to-br from-red-50/90 via-red-100/90 to-gray-100/90 backdrop-blur-sm">
-      <div className='border-2 border-red-900 bg-white rounded-lg p-4 w-1/2 mx-auto'>
+      <div className='border-2 border-red-900 bg-white rounded-lg p-4 w-5/6 sm:w-1/2 mx-auto'>
         <div className="sm:mx-auto sm:w-full sm:max-w-md">
           <div className="flex justify-center">
             <img src={schoolLogo} alt="school logo" className="h-26 w-26 text-red-900" />
           </div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+          <h2 className="mt-6 text-center text-lg sm:text-3xl font-extrabold text-gray-900">
             Mahiyangana National School
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
@@ -73,7 +73,7 @@ const Login = () => {
         </div>
 
         <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-          <div className="bg-white py-8 px-4 sm:rounded-lg sm:px-10">
+          <div className="bg-white sm:py-8 sm:px-4 sm:rounded-lg">
             <form className="space-y-6" onSubmit={handleSubmit}>
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-gray-700">
@@ -132,7 +132,7 @@ const Login = () => {
                   <div className="w-full border-t border-gray-300"></div>
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-white text-gray-500">
+                  <span className="px-2 bg-white text-gray-500 text-center ">
                     Please contact your administrator for login credentials
                   </span>
                 </div>

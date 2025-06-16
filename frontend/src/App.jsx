@@ -12,12 +12,12 @@ const App = () => {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-    <Router>
-      <AuthProvider>
-        <Toaster position="top-right" />
+      <Router>
+        <AuthProvider>
+          <Toaster position="top-right" />
           <AppRoutes />
-      </AuthProvider>
-    </Router>
+        </AuthProvider>
+      </Router>
     </ThemeProvider>
   );
 };
