@@ -19,7 +19,7 @@ const AddStaffModal = ({ onClose, onSubmit }) => {
     name: '',
     email: '',
     password: '',
-    staffType: 'teaching' // Default to teaching staff
+    staffType: 'teaching' 
   });
 
   const handleChange = (e) => {
@@ -37,7 +37,7 @@ const AddStaffModal = ({ onClose, onSubmit }) => {
 
   return (
     <div className="fixed inset-0 bg-black/50  bg-opacity-50 overflow-y-auto h-full w-full z-50">
-      <div className="relative top-20 mx-auto p-5 w-96 shadow-lg rounded-md bg-white">
+      <div className="relative top-20 mx-auto p-5 w-5/6 sm:w-96 shadow-lg rounded-md bg-white">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-semibold text-gray-900">Add New Staff Member</h3>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700">

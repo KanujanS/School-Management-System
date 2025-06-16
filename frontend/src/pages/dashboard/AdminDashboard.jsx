@@ -192,13 +192,13 @@ const AdminDashboard = () => {
         {/* O/L Classes */}
         <div className="mb-8">
           <h3 className="text-lg font-medium text-gray-900 mb-4">Ordinary Level Classes</h3>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
           {ordinaryLevelClasses.map(grade => (
               divisions.map(division => (
                   <button
                   key={`${grade}${division}`}
                     onClick={() => handleClassClick(grade, division)}
-                  className="p-4 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
+                  className="px-3 py-2 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
                   >
                   <p className="text-lg font-semibold text-red-900">{grade}{division}</p>
                   <p className="text-sm text-gray-600">Grade {grade}</p>
