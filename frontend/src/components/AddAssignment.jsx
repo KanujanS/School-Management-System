@@ -91,7 +91,7 @@ const AddAssignment = ({ onClose, onAdd }) => {
   }, []);
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-50">
+    <div className="fixed inset-0 flex  justify-center items-center z-50">
       <div className="fixed inset-0 bg-black/50"></div>
 
       <div className="relative w-full max-w-md p-6 mx-4 bg-white rounded-lg shadow-xl">
