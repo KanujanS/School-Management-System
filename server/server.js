@@ -79,7 +79,7 @@ const startServer = async () => {
     await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/school_management');
     console.log('Connected to MongoDB');
     
-    const PORT = process.env.PORT || 5002;
+    const PORT = process.env.PORT || 5003;
     app.listen(PORT, () => {
       console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`.yellow.bold);
       console.log(`Test the server: http://localhost:${PORT}/test`);

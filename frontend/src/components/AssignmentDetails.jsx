@@ -11,7 +11,7 @@ const AssignmentDetails = ({ assignment, onClose }) => {
       setDownloadingFiles(prev => ({ ...prev, [fileUrl]: true }));
 
       // Ensure we're using the correct URL format
-      const baseUrl = 'http://localhost:5002';
+      const baseUrl = 'http://localhost:5003';
       const downloadUrl = fileUrl.startsWith('http') ? fileUrl : `${baseUrl}${fileUrl}`;
 
       console.log('Downloading file from:', downloadUrl);
