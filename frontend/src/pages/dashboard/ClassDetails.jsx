@@ -173,11 +173,10 @@ const ClassDetails = () => {
       if (response.success) {
         setStudents(prev => [...prev, response.data]);
         
-        // Show success message with password
+        // Show success message
         toast.success(
           <div>
             Student added successfully!<br />
-            Initial Password: {studentData.password}
           </div>,
           { duration: 10000 }
         );

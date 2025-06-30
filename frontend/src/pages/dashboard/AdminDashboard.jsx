@@ -143,12 +143,12 @@ const AdminDashboard = () => {
           <div className="mt-4">
             <div className="flex items-center justify-between text-sm text-gray-600">
               <span>School Capacity</span>
-              <span>1500 Students</span>
+              <span>2500 Students</span>
             </div>
             <div className="mt-1 w-full bg-gray-200 rounded-full h-2">
               <div 
                 className="bg-red-900 h-2 rounded-full" 
-                style={{ width: `${((statistics?.totalStudents || 0) / 1500) * 100}%` }}
+                style={{ width: `${((statistics?.totalStudents || 0) / 2500) * 100}%` }}
               ></div>
             </div>
           </div>
