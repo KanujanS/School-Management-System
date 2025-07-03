@@ -1,4 +1,4 @@
-import Attendance from '../models/Attendance.js';
+import Attendance from '../models/attendance.js';
 import User from '../models/User.js';
 
 // @desc    Get students by class
@@ -25,19 +25,6 @@ export const getStudentsByClass = async (req, res) => {
       role: 'student',
       class: decodeURIComponent(className) // Class names are already hyphenated in the database
     }).select('_id name admissionNumber class');
-
-    console.log('Debug - Query results:', {
-      totalFound: students.length,
-      sample: students[0] ? {
-        id: students[0]._id,
-        name: students[0].name,
-        class: students[0].class
-      } : null,
-      query: {
-        role: 'student',
-        class: decodeURIComponent(className)
-      }
-    });
 
     // Return empty array if no students found
     if (!students || students.length === 0) {
@@ -139,7 +126,8 @@ export const createAttendance = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to create attendance record',
-      error: error.message
+      error: error.message,
+      requestBody: req.body // <-- Add this
     });
   }
 };
