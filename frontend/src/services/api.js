@@ -503,11 +503,11 @@ export const attendanceAPI = {
           const studentData = student.student || {};
           return {
             ...student,
-            status: student.status || 'absent', // Default to absent if no status
+            status: student.status || 'absent', 
             student: {
               _id: studentData._id || 'unknown',
               name: studentData.name || 'Unknown Student',
-              admissionNumber: studentData.admissionNumber || studentData.studentId || 'N/A'
+              admissionNumber: studentData.admissionNumber || 'N/A'
             }
           };
         })

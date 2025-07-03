@@ -353,9 +353,10 @@ export const deleteAssignment = async (req, res) => {
 
     // Allow admin to delete any assignment, staff can only delete their own
     const isAdmin = req.user.role === 'admin';
+    const isStaff = req.user.role === 'staff';
     const isCreator = assignment.createdBy.toString() === req.user._id.toString();
 
-    if (!isAdmin && !isCreator) {
+    if (!isAdmin && !isStaff && !isCreator) {
       console.log('Debug - Delete authorization failed:', {
         userRole: req.user.role,
         userId: req.user._id,

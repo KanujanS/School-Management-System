@@ -30,9 +30,12 @@ const attendanceSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Create separate indexes for better query performance
+//Indexes for performance and filtering
 attendanceSchema.index({ class: 1 });
 attendanceSchema.index({ date: 1 });
+
+// NEW: Index to efficiently query attendance by student
+attendanceSchema.index({ 'students.student': 1, date: 1 });
 
 const Attendance = mongoose.model('Attendance', attendanceSchema);
 
