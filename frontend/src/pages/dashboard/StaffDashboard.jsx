@@ -1,13 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Grid, Typography, Card, CardContent, CircularProgress, Alert } from '@mui/material';
+import { Box, CircularProgress, Alert } from '@mui/material';
 import { useAuth } from '../../context/AuthContext';
 import { assignmentsAPI, marksAPI, attendanceAPI, notificationAPI } from '../../services/api';
-import {
-  DocumentPlusIcon,
-  UserGroupIcon,
-  AcademicCapIcon,
-  BellIcon
-} from '@heroicons/react/24/outline';
+import { DocumentPlusIcon, UserGroupIcon, AcademicCapIcon, BellIcon} from '@heroicons/react/24/outline';
 import ImageSlider from '../../components/ImageSlider';
 import AddAssignment from '../../components/AddAssignment';
 import AddMarks from '../../components/AddMarks';
@@ -148,9 +143,18 @@ const StaffDashboard = () => {
 
   return (
     <Box p={3}>
-      <Typography variant="h4" gutterBottom>
-        Welcome, {user?.name}
-      </Typography>
+      {/* Welcome Section with Image Slider */}
+      <div className="bg-white rounded-lg shadow-md overflow-hidden">
+        <ImageSlider />
+        <div className="p-6">
+          <h1 className="text-3xl font-bold text-gray-900">
+            Welcome back, {user.name}!
+          </h1>
+          <p className="mt-2 text-gray-600">
+            Here's an overview of your academic progress
+          </p>
+        </div>
+      </div>
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mt-6">
