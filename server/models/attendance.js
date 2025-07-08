@@ -12,7 +12,7 @@ const attendanceSchema = new mongoose.Schema({
   students: [{
     student: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
+      ref: 'Student',
       required: [true, 'Student ID is required']
     },
     status: {
