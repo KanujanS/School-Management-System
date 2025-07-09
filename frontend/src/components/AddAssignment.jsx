@@ -203,6 +203,7 @@ const AddAssignment = ({ onClose, onAdd }) => {
           </div>
 
           <div>
+            {/* Some Changes in add marks */}
             <label className="block text-sm font-medium text-gray-700">
               Class
             </label>
@@ -235,7 +236,7 @@ const AddAssignment = ({ onClose, onAdd }) => {
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-900 focus:ring-red-900 sm:text-sm"
             />
           </div>
-
+          
           <div>
             <label className="block text-sm font-medium text-gray-700">
               Due Date

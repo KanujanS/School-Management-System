@@ -82,7 +82,8 @@ const Navbar = () => {
                 )}
               </div>
             </div>
-
+            
+            {/* Some Changes in mobile screen */}
             {/* Mobile Navigation */}
             <Disclosure.Panel className="sm:hidden">
               <div className="space-y-1 px-2 pb-3 pt-2">
