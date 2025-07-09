@@ -179,16 +179,15 @@ const Assignments = () => {
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Header section */}
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-800 flex items-center">
+      <div className="flex justify-between items-center mb-6 gap-3">
+        <h1 className="text-xl font-bold text-gray-800 flex items-center">
           <DocumentPlusIcon className="h-8 w-8 mr-2 text-red-800" />
           Assignments
         </h1>
         {(user?.role === 'staff' || user?.role === 'admin') && (
           <button
             onClick={handleAddAssignment}
-            className="bg-red-800 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors duration-200 flex items-center"
-          >
+            className="bg-red-800 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors duration-200 flex items-center">
             <DocumentPlusIcon className="h-5 w-5 mr-2" />
             Add Assignment
           </button>

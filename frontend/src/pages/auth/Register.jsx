@@ -121,7 +121,7 @@ const Register = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-50 via-red-100 to-gray-100">
-      <div className="max-w-md w-full space-y-8 bg-white/80 backdrop-blur-sm p-8 rounded-xl shadow-xl">
+      <div className="max-w-md w-5/6 sm:w-1/2 space-y-8 bg-white/80 backdrop-blur-sm p-8 rounded-xl shadow-xl">
         <div>
           <img
             className="mx-auto h-24 w-auto"

@@ -9,6 +9,18 @@ const Navbar = () => {
   const { user, logout } = useAuth();
   const location = useLocation();
 
+  const [isOpen, setIsOpen] = useState(false);
+
+  const toggleMenu = () => {
+    setIsOpen(!isOpen);
+  };
+
+  const handleNavLinkClick = () => {
+    if(isOpen) {
+      setIsOpen(false)
+    }
+  };
+
   const navigation = user
     ? [
         { name: 'Dashboard', href: `/${user?.role}` },
