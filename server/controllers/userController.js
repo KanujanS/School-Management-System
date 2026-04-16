@@ -70,7 +70,7 @@ export const getStudentsByClass = async (req, res) => {
     // Find all students in the class
     const students = await User.find({
       role: 'student',
-      class: decodeURIComponent(className) // Class names are already hyphenated in the database
+      class: decodeURIComponent(className)
     }).select('_id name admissionNumber class');
 
     console.log('Debug - Query results:', {
