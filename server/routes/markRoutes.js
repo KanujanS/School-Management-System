@@ -2,6 +2,7 @@ import express from 'express';
 import { 
     getClasses, 
     getStudentsByClass, 
+    getStudentByIndexNumber,
     addMarks, 
     updateMarks, 
     deleteMarks, 
@@ -17,6 +18,7 @@ router.use(protect);
 
 // Route accessible by all authenticated users (including students)
 router.get('/student/:studentId', getStudentMarks);
+router.get('/lookup/:indexNumber', authorize('staff', 'admin'), getStudentByIndexNumber);
 
 // Routes accessible by staff and admin only
 router.use(authorize('staff', 'admin'));

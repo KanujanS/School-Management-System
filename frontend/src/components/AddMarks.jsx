@@ -14,12 +14,9 @@ const AddMarks = ({ onClose, onAdd, selectedClass: initialClass }) => {
   const [subjectMarks, setSubjectMarks] = useState([]);
   const [availableSubjects, setAvailableSubjects] = useState([]);
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (formData.class) {
-      updateAvailableSubjects();
-    }
-  }, [formData.class]);
+  const [isLookupLoading, setIsLookupLoading] = useState(false);
+  const [lookupError, setLookupError] = useState("");
+  const [studentEmail, setStudentEmail] = useState("");
 
   // Predefined list of subjects by category
   const subjects = {
@@ -98,6 +95,44 @@ const AddMarks = ({ onClose, onAdd, selectedClass: initialClass }) => {
       updateAvailableSubjects();
     }
   }, [formData.class]);
+
+  useEffect(() => {
+    const lookupStudentByIndex = async () => {
+      const indexNumber = formData.indexNumber?.trim();
+
+      if (!indexNumber) {
+        setLookupError("");
+        setStudentEmail("");
+        return;
+      }
+
+      setIsLookupLoading(true);
+      try {
+        const studentData = await marksAPI.getStudentByIndexNumber(indexNumber);
+
+        setFormData((prev) => ({
+          ...prev,
+          studentName: studentData.name || prev.studentName,
+          class: studentData.class || prev.class,
+          indexNumber: studentData.indexNumber || prev.indexNumber
+        }));
+
+        setStudentEmail(studentData.email || "");
+        setLookupError("");
+      } catch (error) {
+        setLookupError(error.message || "Student details could not be loaded");
+        setStudentEmail("");
+      } finally {
+        setIsLookupLoading(false);
+      }
+    };
+
+    const handler = setTimeout(() => {
+      lookupStudentByIndex();
+    }, 500);
+
+    return () => clearTimeout(handler);
+  }, [formData.indexNumber]);
 
   // Predefined list of all classes
   const allClasses = [
@@ -261,6 +296,7 @@ const AddMarks = ({ onClose, onAdd, selectedClass: initialClass }) => {
                 className="w-full px-3 py-2 border rounded-lg border-gray-300 focus:outline-none focus:ring-2 focus:ring-red-500"
                 required
                 placeholder="Enter student name"
+                readOnly={Boolean(formData.indexNumber && formData.studentName && !lookupError)}
               />
             </div>
 
@@ -269,11 +305,23 @@ const AddMarks = ({ onClose, onAdd, selectedClass: initialClass }) => {
               <input
                 type="text"
                 value={formData.indexNumber}
-                onChange={(e) => setFormData({ ...formData, indexNumber: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, indexNumber: e.target.value });
+                  setLookupError("");
+                }}
                 className="w-full px-3 py-2 border rounded-lg border-gray-300 focus:outline-none focus:ring-2 focus:ring-red-500"
                 required
                 placeholder="Enter index number"
               />
+              {isLookupLoading && (
+                <p className="text-xs text-gray-500 mt-1">Loading student details...</p>
+              )}
+              {!isLookupLoading && lookupError && (
+                <p className="text-xs text-red-600 mt-1">{lookupError}</p>
+              )}
+              {!isLookupLoading && !lookupError && studentEmail && (
+                <p className="text-xs text-green-700 mt-1">Student: {studentEmail}</p>
+              )}
             </div>
 
             <div>

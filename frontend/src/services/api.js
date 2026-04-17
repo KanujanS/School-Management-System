@@ -375,27 +375,25 @@ export const marksAPI = {
         );
       }
 
-      // Normalize the data
+      // Normalize the data while preserving server mark shape.
       const marks = response.data.data || [];
       return marks.map((mark) => ({
         ...mark,
         _id: mark._id || `temp-${Math.random()}`,
-        class: mark.class?.replace(/\s+/g, "-") || "Unknown Class",
+        class: mark.class?.replace(/\s+/g, "-") || "Unknown-Class",
         student: mark.student
           ? {
               ...mark.student,
-              _id: mark.student._id || `temp-student-${Math.random()}`,
               name: mark.student.name || "Unknown Student",
-              admissionNumber: mark.student.admissionNumber || "N/A",
-              class:
-                mark.student.class?.replace(/\s+/g, "-") || "Unknown Class",
+              indexNumber: mark.student.indexNumber || mark.student.admissionNumber || "N/A",
             }
           : null,
-        subject: mark.subject || "Unknown Subject",
-        score: mark.score || 0,
-        totalMarks: mark.totalMarks || 100,
-        grade: mark.grade || "F",
-        examType: mark.examType || "Unknown Term",
+        subjects: Array.isArray(mark.subjects)
+          ? mark.subjects.map((subject) => ({
+              ...subject,
+              totalMarks: subject.totalMarks || 100,
+            }))
+          : [],
       }));
     } catch (error) {
       console.error("Error fetching student marks:", {
@@ -414,6 +412,29 @@ export const marksAPI = {
       } else {
         throw error;
       }
+    }
+  },
+
+  getStudentByIndexNumber: async (indexNumber) => {
+    try {
+      if (!indexNumber) {
+        throw new Error("Index number is required");
+      }
+
+      const response = await api.get(
+        `/api/marks/lookup/${encodeURIComponent(indexNumber.trim())}`
+      );
+
+      if (!response.data?.success) {
+        throw new Error(response.data?.message || "Failed to fetch student details");
+      }
+
+      return response.data.data;
+    } catch (error) {
+      if (error.response?.data?.message) {
+        throw new Error(error.response.data.message);
+      }
+      throw error;
     }
   },
 

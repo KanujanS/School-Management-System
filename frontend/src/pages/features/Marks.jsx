@@ -20,6 +20,7 @@ const Marks = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [students, setStudents] = useState([]);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // Predefined list of all classes
   const allClasses = [
@@ -53,8 +54,9 @@ const Marks = () => {
         let data;
         if (user.role === 'student') {
           // For students, use the student-specific endpoint
-          console.log('Debug - Fetching marks for student:', user._id);
-          data = await marksAPI.getStudentMarks(user._id);
+          const studentIdentifier = user.admissionNumber || user.studentId || user.email || user._id;
+          console.log('Debug - Fetching marks for student:', studentIdentifier);
+          data = await marksAPI.getStudentMarks(studentIdentifier);
         } else {
           // For staff/admin, use the regular endpoint with filters
           const filters = {
@@ -148,7 +150,7 @@ const Marks = () => {
     };
 
     fetchMarks();
-  }, [user, selectedClass, selectedTerm]);
+  }, [user, selectedClass, selectedTerm, refreshKey]);
 
   const calculateGrade = (marks, totalMarks) => {
     const percentage = (marks / totalMarks) * 100;
@@ -170,54 +172,9 @@ const Marks = () => {
   };
 
   const handleAddMarks = async (data) => {
-    try {
-      const response = await marksAPI.create(data);
-      
-      if (response) {
-        // Refresh the marks list
-        const updatedMarks = await marksAPI.getAll({
-          class: selectedClass !== 'all' ? selectedClass : undefined,
-          examType: selectedTerm !== 'all' ? selectedTerm : undefined
-        });
-
-        // Process the updated marks data
-        const studentMap = new Map();
-
-        updatedMarks.forEach(mark => {
-          if (!mark.student || !mark.student._id) {
-            console.warn('Invalid mark data:', mark);
-            return;
-          }
-          
-          const student = mark.student;
-          if (!studentMap.has(student._id)) {
-            studentMap.set(student._id, {
-              _id: student._id,
-              name: student.name || 'Unknown Student',
-              admissionNumber: student.admissionNumber || 'N/A',
-              class: mark.class || 'Unknown Class',
-              marks: []
-            });
-          }
-          studentMap.get(student._id).marks.push({
-            ...mark,
-            subject: mark.subject || 'Unknown Subject',
-            score: mark.score || 0,
-            totalMarks: mark.totalMarks || 100,
-            grade: mark.grade || 'F',
-            examType: mark.examType || 'Unknown Term'
-          });
-        });
-
-        const studentArray = Array.from(studentMap.values());
-        setStudents(studentArray);
-        setMarks(updatedMarks.filter(mark => mark.student && mark.student._id));
-        setShowAddModal(false);
-        toast.success('Marks added successfully');
-      }
-    } catch (error) {
-      console.error('Error adding marks:', error);
-      toast.error(error.message || 'Failed to add marks');
+    if (data) {
+      setShowAddModal(false);
+      setRefreshKey(prev => prev + 1);
     }
   };
 
@@ -320,14 +277,14 @@ const Marks = () => {
               <h4 className="text-sm font-medium text-gray-900 mb-4">Marks by Subject</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {selectedStudent.marks
-                  .filter(mark => selectedTerm === 'all' || mark.examType === selectedTerm)
+                  .filter(mark => selectedTerm === 'all' || mark.term === selectedTerm)
                   .map((mark) => (
                     <div key={mark._id} className="bg-gray-50 rounded-lg p-4">
                       <h5 className="font-medium text-gray-900">{mark.subject}</h5>
                       <div className="mt-2 space-y-2">
                         <div className="flex justify-between">
                           <span className="text-sm text-gray-500">Score:</span>
-                          <span className="text-sm font-medium text-gray-900">{mark.score}/{mark.totalMarks}</span>
+                          <span className="text-sm font-medium text-gray-900">{mark.marks}/{mark.totalMarks}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-sm text-gray-500">Grade:</span>
@@ -335,7 +292,7 @@ const Marks = () => {
                         </div>
                         <div className="flex justify-between">
                           <span className="text-sm text-gray-500">Term:</span>
-                          <span className="text-sm text-gray-900">{mark.examType}</span>
+                          <span className="text-sm text-gray-900">{mark.term}</span>
                         </div>
                         {mark.remarks && (
                           <div className="mt-2 text-sm text-gray-500">

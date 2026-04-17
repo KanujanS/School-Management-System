@@ -15,15 +15,26 @@ const StudentDashboard = () => {
   const [marks, setMarks] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  const calculateGrade = (marksValue, totalMarks = 100) => {
+    const percentage = (marksValue / totalMarks) * 100;
+    if (percentage >= 75) return 'A';
+    if (percentage >= 65) return 'B';
+    if (percentage >= 55) return 'C';
+    if (percentage >= 35) return 'S';
+    return 'F';
+  };
+
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
         setIsLoading(true);
         
         // Fetch assignments and marks data
+        const studentIdentifier = user.admissionNumber || user.studentId || user.email || user._id;
+
         const [assignmentsResponse, marksData] = await Promise.all([
           assignmentsAPI.getAll({ class: user.class }),
-          marksAPI.getStudentMarks(user._id)
+          marksAPI.getStudentMarks(studentIdentifier)
         ]);
 
         // Handle assignments response
@@ -38,7 +49,21 @@ const StudentDashboard = () => {
 
         // Handle marks data
         if (Array.isArray(marksData)) {
-          setMarks(marksData);
+          const flattenedMarks = marksData
+            .flatMap((markEntry) =>
+              (markEntry.subjects || []).map((subjectEntry) => ({
+                _id: `${markEntry._id}-${subjectEntry.subject}`,
+                subject: subjectEntry.subject,
+                score: subjectEntry.marks,
+                totalMarks: subjectEntry.totalMarks || 100,
+                grade: calculateGrade(subjectEntry.marks, subjectEntry.totalMarks || 100),
+                term: markEntry.term,
+                createdAt: markEntry.createdAt,
+              }))
+            )
+            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+          setMarks(flattenedMarks);
         } else {
           console.error('Error in marks response:', marksData);
           setMarks([]);
@@ -156,7 +181,7 @@ const StudentDashboard = () => {
                 className="border-l-4 border-purple-500 pl-4 py-2"
               >
                 <h3 className="font-medium text-gray-900">
-                  {mark.subject} - {mark.assignmentTitle}
+                  {mark.subject} ({mark.term})
                 </h3>
                 <p className="text-sm text-gray-500">
                   Score: {mark.score}/{mark.totalMarks} (

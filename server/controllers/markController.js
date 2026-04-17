@@ -1,5 +1,20 @@
 import Mark from '../models/Mark.js';
 import Student from '../models/Student.js';
+import User from '../models/User.js';
+
+const buildClassNameFromStudent = (student) => {
+    if (!student) return null;
+
+    if (student.isAdvancedLevel && student.stream) {
+        return `A/L-${student.stream}`;
+    }
+
+    if (student.grade && student.division) {
+        return `Grade-${student.grade}-${student.division}`;
+    }
+
+    return null;
+};
 
 // Get all marks for staff and admin users
 export const getAllMarks = async (req, res, next) => {
@@ -53,6 +68,56 @@ export const getStudentsByClass = async (req, res, next) => {
         res.status(200).json({
             success: true,
             data: students
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Get student details by index number for mark entry
+export const getStudentByIndexNumber = async (req, res, next) => {
+    try {
+        const { indexNumber } = req.params;
+        const normalizedIndex = (indexNumber || '').trim();
+
+        if (!normalizedIndex) {
+            return res.status(400).json({
+                success: false,
+                message: 'Index number is required'
+            });
+        }
+
+        const student = await Student.findOne({ admissionNumber: normalizedIndex })
+            .select('name admissionNumber email grade division stream isAdvancedLevel');
+
+        const user = await User.findOne({
+            role: 'student',
+            $or: [
+                { admissionNumber: normalizedIndex },
+                { studentId: normalizedIndex }
+            ]
+        }).select('name email class admissionNumber studentId');
+
+        if (!student && !user) {
+            return res.status(404).json({
+                success: false,
+                message: 'Student not found for the provided index number'
+            });
+        }
+
+        const resolvedName = student?.name || user?.name;
+        const resolvedIndexNumber = student?.admissionNumber || user?.admissionNumber || user?.studentId || normalizedIndex;
+        const resolvedEmail = student?.email || user?.email || '';
+        const resolvedClass = user?.class || buildClassNameFromStudent(student) || '';
+
+        res.status(200).json({
+            success: true,
+            data: {
+                name: resolvedName,
+                indexNumber: resolvedIndexNumber,
+                email: resolvedEmail,
+                class: resolvedClass
+            }
         });
     } catch (error) {
         next(error);
@@ -155,17 +220,59 @@ export const addMarks = async (req, res) => {
 export const getStudentMarks = async (req, res, next) => {
     try {
         const { studentId } = req.params;
-        
-        // If the user is a student, they can only access their own marks
-        if (req.user.role === 'student' && req.user._id.toString() !== studentId) {
-            return res.status(403).json({
+
+        const normalizedIdentifier = (studentId || '').trim();
+        if (!normalizedIdentifier) {
+            return res.status(400).json({
                 success: false,
-                message: 'Not authorized to access these marks'
+                message: 'Student identifier is required'
             });
         }
 
-        // Find marks for the student
-        const marks = await Mark.find({ 'student.indexNumber': studentId })
+        // Resolve possible index numbers from identifier.
+        const candidateIndexNumbers = new Set();
+        candidateIndexNumbers.add(normalizedIdentifier);
+
+        const isObjectId = /^[0-9a-fA-F]{24}$/.test(normalizedIdentifier);
+        if (isObjectId) {
+            const userById = await User.findById(normalizedIdentifier).select('admissionNumber studentId');
+            if (userById?.admissionNumber) candidateIndexNumbers.add(userById.admissionNumber);
+            if (userById?.studentId) candidateIndexNumbers.add(userById.studentId);
+        }
+
+        if (normalizedIdentifier.includes('@')) {
+            const userByEmail = await User.findOne({ email: normalizedIdentifier.toLowerCase() })
+                .select('admissionNumber studentId');
+            if (userByEmail?.admissionNumber) candidateIndexNumbers.add(userByEmail.admissionNumber);
+            if (userByEmail?.studentId) candidateIndexNumbers.add(userByEmail.studentId);
+        }
+
+        // Students can only access their own marks.
+        if (req.user.role === 'student') {
+            const allowedIdentifiers = new Set([
+                req.user._id.toString(),
+                req.user.email,
+                req.user.admissionNumber,
+                req.user.studentId
+            ].filter(Boolean));
+
+            if (!allowedIdentifiers.has(normalizedIdentifier)) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Not authorized to access these marks'
+                });
+            }
+
+            if (req.user.admissionNumber) candidateIndexNumbers.add(req.user.admissionNumber);
+            if (req.user.studentId) candidateIndexNumbers.add(req.user.studentId);
+        }
+
+        const query = {
+            $or: Array.from(candidateIndexNumbers).map((index) => ({ 'student.indexNumber': index }))
+        };
+
+        // Find marks for the resolved student identifiers.
+        const marks = await Mark.find(query)
             .populate('addedBy', 'name')
             .sort('-createdAt');
         
