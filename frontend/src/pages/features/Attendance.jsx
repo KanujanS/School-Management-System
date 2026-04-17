@@ -47,8 +47,11 @@ const Attendance = () => {
   const fetchAttendanceRecords = async () => {
     try {
       setLoading(true);
-      const params = user?.role === "student" ? { studentId: user._id } : {};
-      const response = await attendanceAPI.getAll(params);
+      const response =
+        user?.role === "student"
+          ? await attendanceAPI.getStudentAttendance()
+          : await attendanceAPI.getAll({});
+
       if (response.success) {
         setAttendanceRecords(response.data || []);
       } else {
@@ -186,15 +189,17 @@ const Attendance = () => {
             <TableBody>
               {attendanceRecords.map((record) => {
                 const studentStatus =
-                  record.students.find(
-                    (s) => s.student && s.student._id === user._id
-                  )?.status || "absent";
-                const presentCount = record.students.filter(
-                  (s) => s.status === "present"
-                ).length;
-                const absentCount = record.students.filter(
-                  (s) => s.status === "absent"
-                ).length;
+                  user?.role === "student"
+                    ? record.status || "absent"
+                    : "absent";
+                const presentCount =
+                  user?.role === "student"
+                    ? 0
+                    : record.students.filter((s) => s.status === "present").length;
+                const absentCount =
+                  user?.role === "student"
+                    ? 0
+                    : record.students.filter((s) => s.status === "absent").length;
 
                 return (
                   <TableRow key={record._id}>

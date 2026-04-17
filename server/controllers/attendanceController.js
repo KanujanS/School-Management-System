@@ -1,5 +1,6 @@
 import Attendance from "../models/attendance.js";
 import User from "../models/User.js";
+import Student from "../models/Student.js";
 
 // @desc    Get students by class
 // @route   GET /api/users/students
@@ -260,28 +261,46 @@ export const deleteAttendance = async (req, res) => {
 // @access  Private/Student
 export const getStudentAttendance = async (req, res) => {
   try {
-    const studentId = req.user._id;
+    const userId = req.user._id;
 
-    const student = await User.findById(studentId).select(
-      "name admissionNumber"
-    );
+    const user = await User.findById(userId).select("name email admissionNumber studentId");
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
+    }
+
+    const resolvedIndexNumber = user.admissionNumber || user.studentId;
+
+    const student = await Student.findOne({
+      $or: [
+        ...(resolvedIndexNumber ? [{ admissionNumber: resolvedIndexNumber }] : []),
+        ...(user.email ? [{ email: user.email.toLowerCase() }] : [])
+      ]
+    }).select("_id name admissionNumber");
+
     if (!student) {
       return res
         .status(404)
-        .json({ success: false, message: "Student not found" });
+        .json({ success: false, message: "Student profile not found" });
     }
 
     const records = await Attendance.find(
-      { "students.student": studentId },
-      { class: 1, date: 1, students: { $elemMatch: { student: studentId } } }
+      { "students.student": { $in: [student._id, userId] } },
+      { class: 1, date: 1, students: 1 }
     )
       .populate("students.student", "name admissionNumber")
       .sort({ date: -1 });
 
     const result = records.map((record) => ({
+      _id: record._id,
       date: record.date,
       class: record.class,
-      status: record.students[0].status,
+      status:
+        record.students.find((item) => {
+          const id = item?.student?._id?.toString?.() || item?.student?.toString?.();
+          return id === student._id.toString() || id === userId.toString();
+        })?.status || "absent",
       name: student.name,
       admissionNumber: student.admissionNumber,
     }));

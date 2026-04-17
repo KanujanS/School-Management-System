@@ -624,6 +624,24 @@ export const attendanceAPI = {
     }
   },
 
+  getStudentAttendance: async () => {
+    try {
+      const response = await api.get("/api/attendance/student");
+
+      if (!response.data?.success) {
+        return { success: false, data: [] };
+      }
+
+      return {
+        success: true,
+        data: Array.isArray(response.data.data) ? response.data.data : [],
+      };
+    } catch (error) {
+      console.error("Error fetching student attendance:", error);
+      return { success: false, data: [] };
+    }
+  },
+
   create: async (attendanceData) => {
     try {
       // Clone to avoid mutation
