@@ -132,7 +132,9 @@ const Marks = () => {
 
         // If user is a student, automatically set them as the selected student
         if (user.role === 'student') {
-          const studentData = studentArray.find(s => s.id === user.admissionNumber);
+          const studentData = studentArray.find(
+            (s) => s.id === user.admissionNumber || s.id === user.studentId
+          );
           if (studentData) {
             setSelectedStudent(studentData);
             setShowViewModal(true);
@@ -240,6 +242,15 @@ const Marks = () => {
 
   // For students, directly show their marks without the list view
   if (user.role === 'student') {
+    const filteredMarks = selectedStudent?.marks?.filter(
+      (mark) => selectedTerm === 'all' || mark.term === selectedTerm
+    ) || [];
+
+    const groupedByTerm = terms.reduce((acc, term) => {
+      acc[term] = filteredMarks.filter((mark) => mark.term === term);
+      return acc;
+    }, {});
+
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
@@ -274,36 +285,59 @@ const Marks = () => {
             </div>
 
             <div className="mt-6">
-              <h4 className="text-sm font-medium text-gray-900 mb-4">Marks by Subject</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {selectedStudent.marks
-                  .filter(mark => selectedTerm === 'all' || mark.term === selectedTerm)
-                  .map((mark) => (
-                    <div key={mark._id} className="bg-gray-50 rounded-lg p-4">
-                      <h5 className="font-medium text-gray-900">{mark.subject}</h5>
-                      <div className="mt-2 space-y-2">
-                        <div className="flex justify-between">
-                          <span className="text-sm text-gray-500">Score:</span>
-                          <span className="text-sm font-medium text-gray-900">{mark.marks}/{mark.totalMarks}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-sm text-gray-500">Grade:</span>
-                          <span className={`text-sm font-medium ${getGradeColor(mark.grade)}`}>{mark.grade}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-sm text-gray-500">Term:</span>
-                          <span className="text-sm text-gray-900">{mark.term}</span>
-                        </div>
-                        {mark.remarks && (
-                          <div className="mt-2 text-sm text-gray-500">
-                            {mark.remarks}
-                          </div>
-                        )}
+              <h4 className="text-sm font-medium text-gray-900 mb-4">Marks by Term</h4>
+              <div className="space-y-6">
+                {terms.map((term) => {
+                  const termMarks = groupedByTerm[term] || [];
+                  if (termMarks.length === 0) return null;
+
+                  const average = termMarks.reduce(
+                    (sum, mark) => sum + (mark.marks / mark.totalMarks) * 100,
+                    0
+                  ) / termMarks.length;
+
+                  return (
+                    <div key={term} className="border border-gray-200 rounded-lg overflow-hidden">
+                      <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+                        <h5 className="text-base font-semibold text-gray-900">{term}</h5>
+                        <p className="text-sm text-gray-600">Average: {average.toFixed(1)}%</p>
+                      </div>
+
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-white">
+                            <tr>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subject</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Marks</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Percentage</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Grade</th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-100">
+                            {termMarks.map((mark) => (
+                              <tr key={mark._id}>
+                                <td className="px-4 py-3 text-sm text-gray-900">{mark.subject}</td>
+                                <td className="px-4 py-3 text-sm text-gray-700">{mark.marks}</td>
+                                <td className="px-4 py-3 text-sm text-gray-700">{mark.totalMarks}</td>
+                                <td className="px-4 py-3 text-sm text-gray-700">
+                                  {((mark.marks / mark.totalMarks) * 100).toFixed(1)}%
+                                </td>
+                                <td className="px-4 py-3 text-sm">
+                                  <span className={`text-sm font-medium px-2 py-1 rounded-full ${getGradeColor(mark.grade)}`}>
+                                    {mark.grade}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
                     </div>
-                  ))}
+                  );
+                })}
               </div>
-              {selectedStudent.marks.length === 0 && (
+              {filteredMarks.length === 0 && (
                 <div className="text-center py-8">
                   <p className="text-gray-500">No marks available</p>
                 </div>

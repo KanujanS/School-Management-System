@@ -15,15 +15,6 @@ const StudentDashboard = () => {
   const [marks, setMarks] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const calculateGrade = (marksValue, totalMarks = 100) => {
-    const percentage = (marksValue / totalMarks) * 100;
-    if (percentage >= 75) return 'A';
-    if (percentage >= 65) return 'B';
-    if (percentage >= 55) return 'C';
-    if (percentage >= 35) return 'S';
-    return 'F';
-  };
-
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
@@ -49,21 +40,16 @@ const StudentDashboard = () => {
 
         // Handle marks data
         if (Array.isArray(marksData)) {
-          const flattenedMarks = marksData
-            .flatMap((markEntry) =>
-              (markEntry.subjects || []).map((subjectEntry) => ({
-                _id: `${markEntry._id}-${subjectEntry.subject}`,
-                subject: subjectEntry.subject,
-                score: subjectEntry.marks,
-                totalMarks: subjectEntry.totalMarks || 100,
-                grade: calculateGrade(subjectEntry.marks, subjectEntry.totalMarks || 100),
-                term: markEntry.term,
-                createdAt: markEntry.createdAt,
-              }))
-            )
+          const recentMarkEntries = marksData
+            .map((markEntry) => ({
+              _id: markEntry._id,
+              term: markEntry.term,
+              createdAt: markEntry.createdAt,
+              addedBy: markEntry.addedBy?.name || 'Unknown',
+            }))
             .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-          setMarks(flattenedMarks);
+          setMarks(recentMarkEntries);
         } else {
           console.error('Error in marks response:', marksData);
           setMarks([]);
@@ -180,16 +166,11 @@ const StudentDashboard = () => {
                 key={mark._id}
                 className="border-l-4 border-purple-500 pl-4 py-2"
               >
-                <h3 className="font-medium text-gray-900">
-                  {mark.subject} ({mark.term})
-                </h3>
+                <p className="text-sm text-gray-500">Term: {mark.term}</p>
                 <p className="text-sm text-gray-500">
-                  Score: {mark.score}/{mark.totalMarks} (
-                  {((mark.score / mark.totalMarks) * 100).toFixed(1)}%)
+                  Added On: {mark.createdAt ? new Date(mark.createdAt).toLocaleDateString() : 'N/A'}
                 </p>
-                <p className="text-sm text-gray-500">
-                  Grade: <span className="font-medium">{mark.grade}</span>
-                </p>
+                <p className="text-sm text-gray-500">Added By: {mark.addedBy}</p>
               </div>
             ))}
             {marks.length === 0 && (

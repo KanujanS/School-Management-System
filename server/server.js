@@ -15,6 +15,7 @@ import userRoutes from './routes/userRoutes.js';
 import staffRoutes from './routes/staffRoutes.js';
 import morgan from 'morgan';
 import colors from 'colors';
+import Mark from './models/Mark.js';
 
 // ES Module equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -78,6 +79,18 @@ const startServer = async () => {
   try {
     await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/school_management');
     console.log('Connected to MongoDB');
+
+    try {
+      const indexes = await Mark.collection.indexes();
+      const hasLegacyIndex = indexes.some((index) => index.name === 'student_1_subject_1_examType_1');
+
+      if (hasLegacyIndex) {
+        await Mark.collection.dropIndex('student_1_subject_1_examType_1');
+        console.log('Dropped legacy marks index: student_1_subject_1_examType_1');
+      }
+    } catch (indexError) {
+      console.error('Marks index cleanup warning:', indexError.message);
+    }
     
     const PORT = process.env.PORT || 5003;
     app.listen(PORT, () => {

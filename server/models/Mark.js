@@ -59,4 +59,10 @@ const markSchema = new mongoose.Schema({
     }
 });
 
+// One student can have only one marks entry per term in an academic year.
+markSchema.index(
+    { 'student.indexNumber': 1, term: 1, academicYear: 1 },
+    { unique: true, name: 'student_term_year_unique' }
+);
+
 export default mongoose.model('Mark', markSchema);
