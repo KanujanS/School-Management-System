@@ -134,23 +134,6 @@ const AddMarks = ({ onClose, onAdd, selectedClass: initialClass }) => {
     return () => clearTimeout(handler);
   }, [formData.indexNumber]);
 
-  // Predefined list of all classes
-  const allClasses = [
-    // O/L Classes (Grade 6-11)
-    ...[6, 7, 8, 9, 10, 11].flatMap((grade) =>
-      ["A", "B", "C", "D", "E", "F"].map(
-        (division) => `Grade-${grade}-${division}`
-      )
-    ),
-    // A/L Classes with detailed streams
-    "A/L-Physical-Science",
-    "A/L-Biological-Science",
-    "A/L-Bio-Technology",
-    "A/L-Engineering-Technology",
-    "A/L-Commerce",
-    "A/L-Arts",
-  ];
-
   const updateAvailableSubjects = () => {
     let newSubjects = [];
 
@@ -180,14 +163,6 @@ const AddMarks = ({ onClose, onAdd, selectedClass: initialClass }) => {
     }
 
     setAvailableSubjects(newSubjects);
-  };
-
-  const handleClassChange = (event) => {
-    const newClass = event.target.value;
-    setFormData({ ...formData, class: newClass });
-    if (newClass) {
-      updateAvailableSubjects();
-    }
   };
 
   const handleAddMarks = async () => {
@@ -254,59 +229,22 @@ const AddMarks = ({ onClose, onAdd, selectedClass: initialClass }) => {
         <div className="flex-1 overflow-y-auto">
           <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-1">Class</label>
-              <select
-                value={formData.class}
-                onChange={handleClassChange}
-                className="w-full px-3 py-2 border rounded-lg border-gray-300 focus:outline-none focus:ring-2 focus:ring-red-500"
-                required
-              >
-                <option value="">Select class</option>
-                {allClasses.map((className) => (
-                  <option key={className} value={className}>
-                    {className}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-1">Term</label>
-              <select
-                value={formData.term}
-                onChange={(e) => setFormData({ ...formData, term: e.target.value })}
-                className="w-full px-3 py-2 border rounded-lg border-gray-300 focus:outline-none focus:ring-2 focus:ring-red-500"
-                required
-              >
-                <option value="">Select term</option>
-                {terms.map((term) => (
-                  <option key={term} value={term}>
-                    {term}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-1">Student Name</label>
-              <input
-                type="text"
-                value={formData.studentName}
-                onChange={(e) => setFormData({ ...formData, studentName: e.target.value })}
-                className="w-full px-3 py-2 border rounded-lg border-gray-300 focus:outline-none focus:ring-2 focus:ring-red-500"
-                required
-                placeholder="Enter student name"
-                readOnly={Boolean(formData.indexNumber && formData.studentName && !lookupError)}
-              />
-            </div>
-
-            <div>
               <label className="block text-sm font-medium mb-1">Index Number</label>
               <input
                 type="text"
                 value={formData.indexNumber}
                 onChange={(e) => {
-                  setFormData({ ...formData, indexNumber: e.target.value });
+                  const nextIndexNumber = e.target.value;
+                  setFormData({
+                    ...formData,
+                    indexNumber: nextIndexNumber,
+                    studentName: "",
+                    class: "",
+                    term: ""
+                  });
+                  setSubjectMarks([]);
+                  setAvailableSubjects([]);
+                  setStudentEmail("");
                   setLookupError("");
                 }}
                 className="w-full px-3 py-2 border rounded-lg border-gray-300 focus:outline-none focus:ring-2 focus:ring-red-500"
@@ -325,9 +263,54 @@ const AddMarks = ({ onClose, onAdd, selectedClass: initialClass }) => {
             </div>
 
             <div>
+              <label className="block text-sm font-medium mb-1">Student Name</label>
+              <input
+                type="text"
+                value={formData.studentName}
+                className="w-full px-3 py-2 border rounded-lg border-gray-300 focus:outline-none focus:ring-2 focus:ring-red-500"
+                placeholder="Student name will be auto-filled"
+                readOnly
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">Class</label>
+              <input
+                type="text"
+                value={formData.class}
+                className="w-full px-3 py-2 border rounded-lg border-gray-300 focus:outline-none focus:ring-2 focus:ring-red-500"
+                placeholder="Class will be auto-filled"
+                readOnly
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">Term</label>
+              <select
+                value={formData.term}
+                onChange={(e) => setFormData({ ...formData, term: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg border-gray-300 focus:outline-none focus:ring-2 focus:ring-red-500"
+                required
+                disabled={
+                  isLookupLoading ||
+                  Boolean(lookupError) ||
+                  !formData.studentName ||
+                  !formData.class
+                }
+              >
+                <option value="">Select term</option>
+                {terms.map((term) => (
+                  <option key={term} value={term}>
+                    {term}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
               <label className="block text-sm font-medium mb-1">Subjects</label>
               <div className="space-y-2">
-                {availableSubjects.length > 0 ? (
+                {availableSubjects.length > 0 && formData.term ? (
                   availableSubjects.map((subject) => (
                     <div key={subject} className="flex items-center space-x-2">
                       <input
@@ -351,7 +334,7 @@ const AddMarks = ({ onClose, onAdd, selectedClass: initialClass }) => {
                     </div>
                   ))
                 ) : (
-                  <p className="text-gray-500">Select a class to view subjects</p>
+                  <p className="text-gray-500">Enter index number, wait for student details, then select term to enter marks</p>
                 )}
               </div>
             </div>
