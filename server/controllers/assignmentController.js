@@ -4,30 +4,13 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import cloudinary from '../configs/cloudinary.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Configure multer for file upload
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    const uploadDir = path.join(__dirname, '..', 'uploads', 'assignments');
-    // Create directory if it doesn't exist
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    cb(null, uploadDir);
-  },
-  filename: function (req, file, cb) {
-    // Create a safe filename
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const safeFileName = file.originalname.replace(/[^a-zA-Z0-9.]/g, '_');
-    cb(null, uniqueSuffix + '-' + safeFileName);
-  }
-});
-
 const upload = multer({ 
-  storage: storage,
+  storage: multer.memoryStorage(),
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB limit
   },
@@ -50,6 +33,28 @@ const upload = multer({
   }
 }).array('attachments');
 
+const uploadBufferToCloudinary = (file) => {
+  return new Promise((resolve, reject) => {
+    const originalNameWithoutExt = path.parse(file.originalname).name.replace(/[^a-zA-Z0-9-_]/g, '_');
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        folder: 'mns/assignments',
+        resource_type: 'raw',
+        use_filename: false,
+        public_id: `${originalNameWithoutExt}-${uniqueSuffix}`,
+      },
+      (error, result) => {
+        if (error) return reject(error);
+        return resolve(result);
+      }
+    );
+
+    uploadStream.end(file.buffer);
+  });
+};
+
 // @desc    Create a new assignment
 // @route   POST /api/assignments
 // @access  Private/Staff
@@ -63,6 +68,10 @@ export const createAssignment = async (req, res) => {
     }
 
     try {
+      if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+        throw new Error('Cloudinary is not configured. Please set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET in server/.env');
+      }
+
       // Validate class name format
       const className = req.body.class.toLowerCase();
       const isValidClass = /^(grade-\d{1,2}-[a-f]|a\/l-[a-z-]+)$/.test(className);
@@ -72,11 +81,34 @@ export const createAssignment = async (req, res) => {
 
       // Process files
       const files = req.files || [];
-      const attachments = files.map(file => ({
-        fileName: file.originalname,
-        fileUrl: `/api/assignments/download/${file.filename}`,
-        uploadedAt: new Date()
-      }));
+      const uploadedCloudinaryResources = [];
+      let attachments = [];
+
+      try {
+        attachments = await Promise.all(files.map(async (file) => {
+          const uploadResult = await uploadBufferToCloudinary(file);
+          uploadedCloudinaryResources.push(uploadResult.public_id);
+
+          return {
+            fileName: file.originalname,
+            fileUrl: uploadResult.secure_url,
+            cloudinaryPublicId: uploadResult.public_id,
+            uploadedAt: new Date()
+          };
+        }));
+      } catch (uploadError) {
+        await Promise.all(
+          uploadedCloudinaryResources.map(async (publicId) => {
+            try {
+              await cloudinary.uploader.destroy(publicId, { resource_type: 'raw' });
+            } catch (cleanupError) {
+              console.error('Cloudinary cleanup error:', cleanupError.message);
+            }
+          })
+        );
+
+        throw uploadError;
+      }
 
       console.log('Debug - Creating assignment:', {
         ...req.body,
@@ -105,15 +137,6 @@ export const createAssignment = async (req, res) => {
         data: assignment
       });
     } catch (error) {
-      // Delete uploaded files if assignment creation fails
-      if (req.files) {
-        req.files.forEach(file => {
-          const filePath = path.join(__dirname, '..', 'uploads', 'assignments', file.filename);
-          fs.unlink(filePath, (err) => {
-            if (err) console.error('Error deleting file:', err);
-          });
-        });
-      }
 
       console.error('Error creating assignment:', {
         error: error.message,
@@ -369,6 +392,20 @@ export const deleteAssignment = async (req, res) => {
         success: false,
         message: 'Not authorized to delete this assignment'
       });
+    }
+
+    // Delete Cloudinary files for this assignment when available.
+    if (Array.isArray(assignment.attachments) && assignment.attachments.length > 0) {
+      await Promise.all(
+        assignment.attachments.map(async (attachment) => {
+          if (!attachment.cloudinaryPublicId) return;
+          try {
+            await cloudinary.uploader.destroy(attachment.cloudinaryPublicId, { resource_type: 'raw' });
+          } catch (cloudinaryError) {
+            console.error('Error deleting Cloudinary file:', cloudinaryError.message);
+          }
+        })
+      );
     }
 
     await assignment.deleteOne();

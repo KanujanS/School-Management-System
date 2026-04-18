@@ -52,6 +52,9 @@ const assignmentSchema = new mongoose.Schema({
       type: String,
       required: true
     },
+    cloudinaryPublicId: {
+      type: String
+    },
     uploadedAt: {
       type: Date,
       default: Date.now
