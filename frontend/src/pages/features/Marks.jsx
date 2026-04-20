@@ -43,7 +43,11 @@ const Marks = () => {
   const terms = ['Term 1', 'Term 2', 'Term 3'];
 
   const normalizeClassName = (className) =>
-    String(className || '').trim().replace(/\s+/g, '-');
+    String(className || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[\s_]+/g, '-')
+      .replace(/-+/g, '-');
 
   useEffect(() => {
     const fetchMarks = async () => {
@@ -63,9 +67,9 @@ const Marks = () => {
           console.log('Debug - Fetching marks for student:', studentIdentifier);
           data = await marksAPI.getStudentMarks(studentIdentifier);
         } else {
-          // For staff/admin, use the regular endpoint with filters
+          // Apply only term filter server-side; class filtering is handled client-side
+          // to avoid case/format mismatches like Grade-6-A vs grade-6-a.
           const filters = {
-            class: selectedClass === 'all' ? undefined : selectedClass,
             term: selectedTerm === 'all' ? undefined : selectedTerm
           };
           console.log('Debug - Fetching marks with filters:', filters);
@@ -80,12 +84,13 @@ const Marks = () => {
         // Keep both full-student aggregation and term-wise rows for staff/admin table.
         const studentMap = new Map();
         const studentTermMap = new Map();
+        const normalizedSelectedClass = normalizeClassName(selectedClass);
 
         data.forEach(mark => {
           const markClass = normalizeClassName(mark.class || mark.student?.class);
 
           // Skip marks that don't match the selected filters
-          if (selectedClass !== 'all' && markClass !== normalizeClassName(selectedClass)) return;
+          if (selectedClass !== 'all' && markClass !== normalizedSelectedClass) return;
           if (selectedTerm !== 'all' && mark.term !== selectedTerm) return;
 
           if (!mark.student) {
@@ -108,7 +113,7 @@ const Marks = () => {
               id: studentId,
               name: studentName,
               indexNumber: studentId,
-                class: markClass || 'Unknown Class',
+              class: mark.class || mark.student?.class || 'Unknown Class',
               marks: []
             });
           }
@@ -119,7 +124,7 @@ const Marks = () => {
               studentId,
               name: studentName,
               indexNumber: studentId,
-                class: markClass || 'Unknown Class',
+              class: mark.class || mark.student?.class || 'Unknown Class',
               term,
               marks: []
             });
@@ -173,7 +178,7 @@ const Marks = () => {
         setMarks(data.filter(mark => {
           const markClass = normalizeClassName(mark.class || mark.student?.class);
           const matchesClass =
-            selectedClass === 'all' || markClass === normalizeClassName(selectedClass);
+            selectedClass === 'all' || markClass === normalizedSelectedClass;
           const matchesTerm = selectedTerm === 'all' || mark.term === selectedTerm;
           const studentIdentifier = mark.student?.indexNumber || mark.student?.admissionNumber;
           return mark.student && studentIdentifier && matchesClass && matchesTerm;
