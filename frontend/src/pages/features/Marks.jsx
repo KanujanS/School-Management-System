@@ -17,9 +17,11 @@ const Marks = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
+  const [selectedViewTerm, setSelectedViewTerm] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [students, setStudents] = useState([]);
+  const [studentTermRows, setStudentTermRows] = useState([]);
   const [refreshKey, setRefreshKey] = useState(0);
 
   // Predefined list of all classes
@@ -39,6 +41,9 @@ const Marks = () => {
 
   // Terms
   const terms = ['Term 1', 'Term 2', 'Term 3'];
+
+  const normalizeClassName = (className) =>
+    String(className || '').trim().replace(/\s+/g, '-');
 
   useEffect(() => {
     const fetchMarks = async () => {
@@ -72,28 +77,50 @@ const Marks = () => {
           throw new Error('Invalid data format received from server');
         }
 
-        // Group marks by student and term
+        // Keep both full-student aggregation and term-wise rows for staff/admin table.
         const studentMap = new Map();
+        const studentTermMap = new Map();
 
         data.forEach(mark => {
+          const markClass = normalizeClassName(mark.class || mark.student?.class);
+
           // Skip marks that don't match the selected filters
-          if (selectedClass !== 'all' && mark.class !== selectedClass) return;
+          if (selectedClass !== 'all' && markClass !== normalizeClassName(selectedClass)) return;
           if (selectedTerm !== 'all' && mark.term !== selectedTerm) return;
 
-          if (!mark.student || !mark.student.indexNumber) {
+          if (!mark.student) {
             console.warn('Invalid mark data:', mark);
             return;
           }
 
-          const studentId = mark.student.indexNumber;
+          const studentId = mark.student.indexNumber || mark.student.admissionNumber;
+          if (!studentId) {
+            console.warn('Invalid student identifier in mark data:', mark);
+            return;
+          }
+
           const studentName = mark.student.name || 'Unknown Student';
+          const term = mark.term || 'Unknown Term';
+          const termKey = `${studentId}-${term}`;
           
           if (!studentMap.has(studentId)) {
             studentMap.set(studentId, {
               id: studentId,
               name: studentName,
-              admissionNumber: mark.student.indexNumber,
-              class: mark.class,
+              indexNumber: studentId,
+                class: markClass || 'Unknown Class',
+              marks: []
+            });
+          }
+
+          if (!studentTermMap.has(termKey)) {
+            studentTermMap.set(termKey, {
+              id: termKey,
+              studentId,
+              name: studentName,
+              indexNumber: studentId,
+                class: markClass || 'Unknown Class',
+              term,
               marks: []
             });
           }
@@ -101,14 +128,17 @@ const Marks = () => {
           // Process each subject in the mark's subjects array
           if (Array.isArray(mark.subjects)) {
             mark.subjects.forEach(subjectMark => {
-              studentMap.get(studentId).marks.push({
+              const normalizedSubjectMark = {
                 _id: `${mark._id}-${subjectMark.subject}`,
                 subject: subjectMark.subject,
                 marks: subjectMark.marks,
                 totalMarks: subjectMark.totalMarks || 100,
                 grade: calculateGrade(subjectMark.marks, subjectMark.totalMarks || 100),
                 term: mark.term
-              });
+              };
+
+              studentMap.get(studentId).marks.push(normalizedSubjectMark);
+              studentTermMap.get(termKey).marks.push(normalizedSubjectMark);
             });
           }
         });
@@ -118,16 +148,35 @@ const Marks = () => {
           a.name.localeCompare(b.name)
         );
 
+        const termOrder = terms.reduce((acc, term, index) => {
+          acc[term] = index;
+          return acc;
+        }, {});
+
+        const studentTermArray = Array.from(studentTermMap.values()).sort((a, b) => {
+          const nameCompare = a.name.localeCompare(b.name);
+          if (nameCompare !== 0) return nameCompare;
+
+          const aOrder = termOrder[a.term] ?? Number.MAX_SAFE_INTEGER;
+          const bOrder = termOrder[b.term] ?? Number.MAX_SAFE_INTEGER;
+          return aOrder - bOrder;
+        });
+
         console.log('Debug - Filtered student data:', {
           count: studentArray.length,
+          termRows: studentTermArray.length,
           filters: { class: selectedClass, term: selectedTerm }
         });
 
         setStudents(studentArray);
+        setStudentTermRows(studentTermArray);
         setMarks(data.filter(mark => {
-          const matchesClass = selectedClass === 'all' || mark.class === selectedClass;
+          const markClass = normalizeClassName(mark.class || mark.student?.class);
+          const matchesClass =
+            selectedClass === 'all' || markClass === normalizeClassName(selectedClass);
           const matchesTerm = selectedTerm === 'all' || mark.term === selectedTerm;
-          return mark.student && mark.student.indexNumber && matchesClass && matchesTerm;
+          const studentIdentifier = mark.student?.indexNumber || mark.student?.admissionNumber;
+          return mark.student && studentIdentifier && matchesClass && matchesTerm;
         }));
 
         // If user is a student, automatically set them as the selected student
@@ -145,6 +194,7 @@ const Marks = () => {
         setError(error.message || 'Failed to load marks data');
         toast.error(error.message || 'Failed to load marks data');
         setStudents([]);
+        setStudentTermRows([]);
         setMarks([]);
       } finally {
         setIsLoading(false);
@@ -182,20 +232,26 @@ const Marks = () => {
 
   const handleViewMarks = (student) => {
     console.log('Viewing marks for student:', student);
-    setSelectedStudent(student);
+    const fullStudent = students.find((s) => s.id === (student.studentId || student.id));
+    setSelectedStudent(fullStudent || student);
+    setSelectedViewTerm(student.term || null);
     setShowViewModal(true);
   };
 
   const handleCloseModal = () => {
     setShowViewModal(false);
     setSelectedStudent(null);
+    setSelectedViewTerm(null);
   };
 
   const handleDeleteMarks = async (studentId) => {
     try {
       if (window.confirm('Are you sure you want to delete all marks for this student?')) {
         // Find all marks for this student
-        const studentMarks = marks.filter(mark => mark.student.indexNumber === studentId);
+        const studentMarks = marks.filter(mark => {
+          const indexNumber = mark.student?.indexNumber || mark.student?.admissionNumber;
+          return indexNumber === studentId;
+        });
         
         // Delete each mark
         for (const mark of studentMarks) {
@@ -204,7 +260,11 @@ const Marks = () => {
         
         // Remove the deleted student's marks from the state
         setStudents(prevStudents => prevStudents.filter(student => student.id !== studentId));
-        setMarks(prevMarks => prevMarks.filter(mark => mark.student.indexNumber !== studentId));
+        setStudentTermRows(prevRows => prevRows.filter(row => row.studentId !== studentId));
+        setMarks(prevMarks => prevMarks.filter(mark => {
+          const indexNumber = mark.student?.indexNumber || mark.student?.admissionNumber;
+          return indexNumber !== studentId;
+        }));
         
         toast.success('Marks deleted successfully');
       }
@@ -434,7 +494,7 @@ const Marks = () => {
       {/* Results Summary */}
       {!isLoading && !error && (
         <div className="mb-4 text-sm text-gray-600">
-          Showing {students.length} student{students.length !== 1 ? 's' : ''} 
+          Showing {studentTermRows.length} term entr{studentTermRows.length === 1 ? 'y' : 'ies'}
           {selectedClass !== 'all' && ` in ${selectedClass}`}
           {selectedTerm !== 'all' && ` for ${selectedTerm}`}
         </div>
@@ -449,7 +509,7 @@ const Marks = () => {
                 Student Name
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Admission Number
+                Index Number
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Class
@@ -463,13 +523,13 @@ const Marks = () => {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {students.map((student) => (
+            {studentTermRows.map((student) => (
               <tr key={student.id}>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{student.name}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{student.admissionNumber}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{student.indexNumber}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{student.class}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {student.marks.length > 0 ? student.marks[0].term : '-'}
+                  {student.term}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-3">
                   <button
@@ -481,7 +541,7 @@ const Marks = () => {
                   </button>
                   {user.role === 'admin' && (
                     <button
-                      onClick={() => handleDeleteMarks(student.id)}
+                      onClick={() => handleDeleteMarks(student.studentId || student.id)}
                       className="text-red-900 hover:text-red-800 inline-flex items-center"
                       title="Delete Marks"
                     >
@@ -524,10 +584,13 @@ const Marks = () => {
                     </h3>
                     <div className="flex gap-4">
                       <p className="text-sm text-gray-600">
-                        <span className="font-medium">Admission Number:</span> {selectedStudent.admissionNumber}
+                        <span className="font-medium">Index Number:</span> {selectedStudent.indexNumber}
                       </p>
                       <p className="text-sm text-gray-600">
                         <span className="font-medium">Class:</span> {selectedStudent.class}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        <span className="font-medium">Term:</span> {selectedViewTerm || 'All Terms'}
                       </p>
                     </div>
                   </div>
@@ -540,58 +603,67 @@ const Marks = () => {
                 </div>
 
                 <div className="mt-4 space-y-6">
-                  {terms.map(term => {
-                    const termMarks = selectedStudent.marks.filter(mark => mark.term === term);
-                    if (termMarks.length === 0) return null;
+                  {(() => {
+                    const filteredMarks = (selectedStudent.marks || []).filter((mark) =>
+                      selectedViewTerm ? mark.term === selectedViewTerm : true
+                    );
+
+                    if (filteredMarks.length === 0) {
+                      return (
+                        <div className="text-center py-8">
+                          <p className="text-gray-500">No marks available for this term</p>
+                        </div>
+                      );
+                    }
+
+                    const average =
+                      filteredMarks.reduce(
+                        (sum, mark) => sum + (mark.marks / mark.totalMarks) * 100,
+                        0
+                      ) / filteredMarks.length;
 
                     return (
-                      <div key={term} className="bg-white rounded-lg border border-gray-200">
-                        <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
-                          <h4 className="text-lg font-medium text-gray-900">{term}</h4>
+                      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                        <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+                          <h4 className="text-base font-semibold text-gray-900">
+                            {selectedViewTerm || 'All Terms'}
+                          </h4>
+                          <p className="text-sm text-gray-600">Average: {average.toFixed(1)}%</p>
                         </div>
-                        <div className="p-4">
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {termMarks.map((mark) => (
-                              <div key={`${mark._id}-${mark.subject}`} 
-                                   className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                                <div className="px-4 py-2 bg-gray-50 border-b border-gray-200">
-                                  <h5 className="font-medium text-gray-900">{mark.subject}</h5>
-                                </div>
-                                <div className="p-4">
-                                  <div className="space-y-2">
-                                    <div className="flex justify-between items-center">
-                                      <span className="text-sm text-gray-600">Marks:</span>
-                                      <span className="text-sm font-medium text-gray-900">
-                                        {mark.marks} / {mark.totalMarks}
-                                      </span>
-                                    </div>
-                                    <div className="flex justify-between items-center">
-                                      <span className="text-sm text-gray-600">Percentage:</span>
-                                      <span className="text-sm font-medium text-gray-900">
-                                        {((mark.marks / mark.totalMarks) * 100).toFixed(1)}%
-                                      </span>
-                                    </div>
-                                    <div className="flex justify-between items-center">
-                                      <span className="text-sm text-gray-600">Grade:</span>
-                                      <span className={`text-sm font-medium px-2 py-1 rounded-full ${getGradeColor(mark.grade)}`}>
-                                        {mark.grade}
-                                      </span>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
+
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full divide-y divide-gray-200">
+                            <thead className="bg-white">
+                              <tr>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subject</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Marks</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Percentage</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Grade</th>
+                              </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-100">
+                              {filteredMarks.map((mark) => (
+                                <tr key={`${mark._id}-${mark.subject}`}>
+                                  <td className="px-4 py-3 text-sm text-gray-900">{mark.subject}</td>
+                                  <td className="px-4 py-3 text-sm text-gray-700">{mark.marks}</td>
+                                  <td className="px-4 py-3 text-sm text-gray-700">{mark.totalMarks}</td>
+                                  <td className="px-4 py-3 text-sm text-gray-700">
+                                    {((mark.marks / mark.totalMarks) * 100).toFixed(1)}%
+                                  </td>
+                                  <td className="px-4 py-3 text-sm">
+                                    <span className={`text-sm font-medium px-2 py-1 rounded-full ${getGradeColor(mark.grade)}`}>
+                                      {mark.grade}
+                                    </span>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
                         </div>
                       </div>
                     );
-                  })}
-
-                  {(!selectedStudent.marks || selectedStudent.marks.length === 0) && (
-                    <div className="text-center py-8">
-                      <p className="text-gray-500">No marks available</p>
-                    </div>
-                  )}
+                  })()}
                 </div>
               </div>
               <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">

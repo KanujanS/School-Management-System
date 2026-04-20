@@ -337,6 +337,11 @@ export const marksAPI = {
               ...mark.student,
               _id: mark.student._id || `temp-student-${Math.random()}`,
               name: mark.student.name || "Unknown Student",
+              indexNumber:
+                mark.student.indexNumber ||
+                mark.student.admissionNumber ||
+                mark.student.studentId ||
+                "N/A",
               admissionNumber: mark.student.admissionNumber || "N/A",
               class:
                 mark.student.class?.replace(/\s+/g, "-") || "Unknown Class",
