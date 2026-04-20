@@ -6,6 +6,11 @@ import toast from 'react-hot-toast';
 const AssignmentDetails = ({ assignment, onClose }) => {
   const [downloadingFiles, setDownloadingFiles] = useState({});
 
+  const getFileExtension = (name = '') => {
+    const parts = String(name).split('.');
+    return parts.length > 1 ? parts.pop().toLowerCase() : '';
+  };
+
   const handleDownload = async (fileUrl, fileName) => {
     try {
       setDownloadingFiles(prev => ({ ...prev, [fileUrl]: true }));
@@ -28,11 +33,23 @@ const AssignmentDetails = ({ assignment, onClose }) => {
         throw new Error(errorData.message || `Failed to download file: ${response.statusText}`);
       }
 
-      // Get the content disposition header to get the filename
+      // Prefer the originally uploaded filename so extension/format is preserved.
+      // Some storage providers return a generated name without extension.
       const contentDisposition = response.headers.get('content-disposition');
       const serverFileName = contentDisposition
-        ? decodeURIComponent(contentDisposition.split('filename=')[1].replace(/"/g, ''))
-        : fileName;
+        ? decodeURIComponent(contentDisposition.split('filename=')[1]?.replace(/"/g, '') || '')
+        : '';
+
+      const originalExtension = getFileExtension(fileName);
+      const serverExtension = getFileExtension(serverFileName);
+      const downloadFileName =
+        !fileName
+          ? serverFileName || 'download'
+          : !serverFileName
+            ? fileName
+            : originalExtension && !serverExtension
+              ? fileName
+              : fileName;
 
       // Get the blob from the response
       const blob = await response.blob();
@@ -43,7 +60,7 @@ const AssignmentDetails = ({ assignment, onClose }) => {
       // Create a temporary link element
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', serverFileName);
+      link.setAttribute('download', downloadFileName);
       document.body.appendChild(link);
       link.click();
 
