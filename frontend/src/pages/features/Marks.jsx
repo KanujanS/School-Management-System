@@ -249,29 +249,49 @@ const Marks = () => {
     setSelectedViewTerm(null);
   };
 
-  const handleDeleteMarks = async (studentId) => {
+  const handleDeleteMarks = async (studentId, term) => {
     try {
-      if (window.confirm('Are you sure you want to delete all marks for this student?')) {
-        // Find all marks for this student
+      if (window.confirm(`Are you sure you want to delete ${term} marks for this student?`)) {
+        // Find only the marks that match the selected student and term.
         const studentMarks = marks.filter(mark => {
           const indexNumber = mark.student?.indexNumber || mark.student?.admissionNumber;
-          return indexNumber === studentId;
+          return indexNumber === studentId && mark.term === term;
         });
+
+        if (studentMarks.length === 0) {
+          toast.error('No marks found for the selected term');
+          return;
+        }
         
         // Delete each mark
         for (const mark of studentMarks) {
           await marksAPI.deleteMarks(mark._id);
         }
         
-        // Remove the deleted student's marks from the state
-        setStudents(prevStudents => prevStudents.filter(student => student.id !== studentId));
-        setStudentTermRows(prevRows => prevRows.filter(row => row.studentId !== studentId));
+        // Remove only the deleted term rows from local state.
+        setStudentTermRows(prevRows =>
+          prevRows.filter(row => !(row.studentId === studentId && row.term === term))
+        );
+
         setMarks(prevMarks => prevMarks.filter(mark => {
           const indexNumber = mark.student?.indexNumber || mark.student?.admissionNumber;
-          return indexNumber !== studentId;
+          return !(indexNumber === studentId && mark.term === term);
         }));
+
+        setStudents(prevStudents =>
+          prevStudents
+            .map(student => {
+              if (student.id !== studentId) return student;
+              const updatedMarks = (student.marks || []).filter(mark => mark.term !== term);
+              return {
+                ...student,
+                marks: updatedMarks,
+              };
+            })
+            .filter(student => (student.marks || []).length > 0)
+        );
         
-        toast.success('Marks deleted successfully');
+        toast.success(`${term} marks deleted successfully`);
       }
     } catch (error) {
       console.error('Error deleting marks:', error);
@@ -546,7 +566,7 @@ const Marks = () => {
                   </button>
                   {user.role === 'admin' && (
                     <button
-                      onClick={() => handleDeleteMarks(student.studentId || student.id)}
+                      onClick={() => handleDeleteMarks(student.studentId || student.id, student.term)}
                       className="text-red-900 hover:text-red-800 inline-flex items-center"
                       title="Delete Marks"
                     >

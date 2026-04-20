@@ -145,6 +145,8 @@ const StaffManagement = () => {
   const [error, setError] = useState(null);
   const [showAddStaffModal, setShowAddStaffModal] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState(null);
+  const [showAll, setShowAll] = useState(false);
+  const ITEMS_PER_PAGE = 5;
 
   useEffect(() => {
     fetchStaffList();
@@ -324,7 +326,7 @@ const StaffManagement = () => {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {staffList.map((staff) => (
+            {(showAll ? staffList : staffList.slice(0, ITEMS_PER_PAGE)).map((staff) => (
               <tr key={staff._id} className={!staff.isActive ? 'bg-gray-50' : ''}>
                 <td className="px-6 py-4 whitespace-nowrap">
                   {staff.name}
@@ -379,6 +381,18 @@ const StaffManagement = () => {
           </tbody>
         </table>
       </div>
+
+      {/* Show More / Show Less Button */}
+      {staffList.length > ITEMS_PER_PAGE && (
+        <div className="mt-6 flex justify-center">
+          <button
+            onClick={() => setShowAll(!showAll)}
+            className="px-6 py-2 bg-red-800 text-white rounded-md hover:bg-red-900 transition-colors font-medium"
+          >
+            {showAll ? 'Show Less' : `Show More (${staffList.length - ITEMS_PER_PAGE} more)`}
+          </button>
+        </div>
+      )}
 
       {showAddStaffModal && (
         <AddStaffModal
