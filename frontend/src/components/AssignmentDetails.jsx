@@ -10,8 +10,8 @@ const AssignmentDetails = ({ assignment, onClose }) => {
     try {
       setDownloadingFiles(prev => ({ ...prev, [fileUrl]: true }));
 
-      // Ensure we're using the correct URL format
-      const baseUrl = 'http://localhost:5003';
+      // Reuse the same backend URL configured in the shared API client.
+      const baseUrl = api.defaults.baseURL;
       const downloadUrl = fileUrl.startsWith('http') ? fileUrl : `${baseUrl}${fileUrl}`;
 
       console.log('Downloading file from:', downloadUrl);
