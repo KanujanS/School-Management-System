@@ -4,6 +4,8 @@ import {
   Button,
   Typography,
   Paper,
+  TextField,
+  MenuItem,
   Table,
   TableBody,
   TableCell,
@@ -33,6 +35,8 @@ import toast from "react-hot-toast";
 const Attendance = () => {
   const { user } = useAuth();
   const [attendanceRecords, setAttendanceRecords] = useState([]);
+  const [selectedDate, setSelectedDate] = useState("");
+  const [selectedClass, setSelectedClass] = useState("all");
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -132,6 +136,38 @@ const Attendance = () => {
     }
   };
 
+  const toInputDate = (value) => {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    const offset = date.getTimezoneOffset();
+    return new Date(date.getTime() - offset * 60000).toISOString().split("T")[0];
+  };
+
+  const normalizeClassName = (value) =>
+    String(value || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[\s_]+/g, "-")
+      .replace(/-+/g, "-");
+
+  const availableClasses = [...new Set(attendanceRecords.map((record) => record.class).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b));
+
+  const filteredRecords = attendanceRecords.filter((record) => {
+    const matchesDate = !selectedDate || toInputDate(record.date) === selectedDate;
+    const matchesClass =
+      selectedClass === "all" ||
+      normalizeClassName(record.class) === normalizeClassName(selectedClass);
+
+    return matchesDate && matchesClass;
+  });
+
+  const handleResetFilters = () => {
+    setSelectedDate("");
+    setSelectedClass("all");
+  };
+
   return (
     <Box p={3}>
       <Box
@@ -156,14 +192,54 @@ const Attendance = () => {
         )}
       </Box>
 
+      {/* Filters */}
+      {user?.role !== "student" && (
+        <Paper sx={{ p: 2, mb: 2 }}>
+          <Box
+            display="flex"
+            gap={2}
+            flexWrap="wrap"
+            alignItems={{ xs: "stretch", sm: "center" }}
+          >
+            <TextField
+              label="Filter by Date"
+              type="date"
+              size="small"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              sx={{ minWidth: 220 }}
+            />
+            <TextField
+              select
+              label="Filter by Class"
+              size="small"
+              value={selectedClass}
+              onChange={(e) => setSelectedClass(e.target.value)}
+              sx={{ minWidth: 220 }}
+            >
+              <MenuItem value="all">All Classes</MenuItem>
+              {availableClasses.map((className) => (
+                <MenuItem key={className} value={className}>
+                  {className}
+                </MenuItem>
+              ))}
+            </TextField>
+            <Button variant="outlined" onClick={handleResetFilters}>
+              Reset Filters
+            </Button>
+          </Box>
+        </Paper>
+      )}
+
       {loading ? (
         <Box display="flex" justifyContent="center" p={3}>
           <Typography>Loading attendance records...</Typography>
         </Box>
-      ) : attendanceRecords.length === 0 ? (
+      ) : filteredRecords.length === 0 ? (
         <Paper sx={{ p: 3, textAlign: "center" }}>
           <Typography color="textSecondary">
-            No attendance records found
+            No attendance records found for selected filters
           </Typography>
         </Paper>
       ) : (
@@ -187,7 +263,7 @@ const Attendance = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {attendanceRecords.map((record) => {
+              {filteredRecords.map((record) => {
                 const studentStatus =
                   user?.role === "student"
                     ? record.status || "absent"
