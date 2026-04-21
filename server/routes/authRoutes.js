@@ -3,6 +3,8 @@ import { protect, admin } from '../middleware/authMiddleware.js';
 import {
   login,
   register,
+  forgotPassword,
+  resetPassword,
   createStaff,
   getAllStaff,
   getDashboardStats,
@@ -16,6 +18,8 @@ const router = express.Router();
 // Public routes
 router.post('/login', login);
 router.post('/register', register);
+router.post('/forgot-password', forgotPassword);
+router.post('/reset-password', resetPassword);
 
 // Protected routes
 router.use(protect);

@@ -2,11 +2,58 @@ import User from '../models/User.js';
 import Student from '../models/Student.js';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
+import nodemailer from 'nodemailer';
 
 // Generate JWT Token
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
     expiresIn: '30d'
+  });
+};
+
+const createOTP = () => String(Math.floor(100000 + Math.random() * 900000));
+
+const hashOTP = (otp) =>
+  crypto.createHash('sha256').update(String(otp)).digest('hex');
+
+const getMailerTransport = () => {
+  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS } = process.env;
+
+  if (!SMTP_HOST || !SMTP_PORT || !SMTP_USER || !SMTP_PASS) {
+    throw new Error('SMTP is not configured. Please set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS in server/.env');
+  }
+
+  return nodemailer.createTransport({
+    host: SMTP_HOST,
+    port: Number(SMTP_PORT),
+    secure: Number(SMTP_PORT) === 465,
+    auth: {
+      user: SMTP_USER,
+      pass: SMTP_PASS
+    }
+  });
+};
+
+const sendPasswordResetOTPEmail = async (toEmail, otp, name) => {
+  const transporter = getMailerTransport();
+  const fromAddress = process.env.SMTP_FROM || process.env.SMTP_USER;
+
+  await transporter.sendMail({
+    from: fromAddress,
+    to: toEmail,
+    subject: 'Mahiyangana National School - Password Reset OTP',
+    text: `Hello ${name || 'User'},\n\nYour password reset OTP is: ${otp}\nThis OTP is valid for 10 minutes.\n\nIf you did not request this, please ignore this email.`,
+    html: `
+      <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #1f2937;">
+        <h2 style="margin-bottom: 8px;">Password Reset Request</h2>
+        <p>Hello ${name || 'User'},</p>
+        <p>Your password reset OTP is:</p>
+        <p style="font-size: 24px; font-weight: 700; letter-spacing: 4px; color: #7f1d1d;">${otp}</p>
+        <p>This OTP is valid for <strong>10 minutes</strong>.</p>
+        <p>If you did not request this, you can safely ignore this email.</p>
+      </div>
+    `
   });
 };
 
@@ -159,6 +206,119 @@ export const login = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error logging in',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Request OTP for password reset
+// @route   POST /api/auth/forgot-password
+// @access  Public
+export const forgotPassword = async (req, res) => {
+  try {
+    const email = String(req.body?.email || '').toLowerCase().trim();
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide email address'
+      });
+    }
+
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'This email is not registered.'
+      });
+    }
+
+    const otp = createOTP();
+    user.passwordResetOTPHash = hashOTP(otp);
+    user.passwordResetOTPExpires = new Date(Date.now() + 10 * 60 * 1000);
+    await user.save({ validateBeforeSave: false });
+
+    await sendPasswordResetOTPEmail(user.email, otp, user.name);
+
+    return res.json({
+      success: true,
+      message: 'OTP has been sent.'
+    });
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to process forgot password request',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Reset password using OTP
+// @route   POST /api/auth/reset-password
+// @access  Public
+export const resetPassword = async (req, res) => {
+  try {
+    const email = String(req.body?.email || '').toLowerCase().trim();
+    const otp = String(req.body?.otp || '').trim();
+    const newPassword = String(req.body?.newPassword || '');
+
+    if (!email || !otp || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email, OTP and new password are required'
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 6 characters long'
+      });
+    }
+
+    const user = await User.findOne({ email }).select('+passwordResetOTPHash +passwordResetOTPExpires');
+
+    if (!user || !user.passwordResetOTPHash || !user.passwordResetOTPExpires) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired OTP'
+      });
+    }
+
+    if (user.passwordResetOTPExpires.getTime() < Date.now()) {
+      user.passwordResetOTPHash = undefined;
+      user.passwordResetOTPExpires = undefined;
+      await user.save({ validateBeforeSave: false });
+
+      return res.status(400).json({
+        success: false,
+        message: 'OTP has expired. Please request a new OTP.'
+      });
+    }
+
+    if (hashOTP(otp) !== user.passwordResetOTPHash) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired OTP'
+      });
+    }
+
+    user.password = newPassword;
+    user.passwordResetOTPHash = undefined;
+    user.passwordResetOTPExpires = undefined;
+    await user.save({ validateBeforeSave: false });
+
+    return res.json({
+      success: true,
+      message: 'Password reset successful. Please login with your new password.'
+    });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to reset password',
       error: error.message
     });
   }

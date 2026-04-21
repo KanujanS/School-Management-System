@@ -128,6 +128,14 @@ const userSchema = new mongoose.Schema({
   isAdvancedLevel: {
     type: Boolean,
     default: false
+  },
+  passwordResetOTPHash: {
+    type: String,
+    select: false
+  },
+  passwordResetOTPExpires: {
+    type: Date,
+    select: false
   }
 }, {
   timestamps: true
