@@ -67,8 +67,8 @@ app.use('/uploads', (req, res, next) => {
 }, express.static(path.join(__dirname, 'uploads')));
 
 // Test route
-app.get('/test', (req, res) => {
-  res.json({ message: 'Server is running' });
+app.get("/", (req, res) => {
+  res.send("API is running successfully");
 });
 
 // Error Handler
