@@ -37,6 +37,7 @@ const Attendance = () => {
   const [attendanceRecords, setAttendanceRecords] = useState([]);
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedClass, setSelectedClass] = useState("all");
+  const [studentIndexSearch, setStudentIndexSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -168,6 +169,34 @@ const Attendance = () => {
     setSelectedClass("all");
   };
 
+  const normalizedIndexSearch = studentIndexSearch.trim().toLowerCase();
+
+  const studentAttendanceLookup =
+    user?.role === "student" || !normalizedIndexSearch
+      ? []
+      : filteredRecords.flatMap((record) =>
+          (record.students || [])
+            .filter((studentRecord) => {
+              const indexNumber = String(
+                studentRecord?.student?.admissionNumber ||
+                  studentRecord?.student?.studentId ||
+                  ""
+              ).toLowerCase();
+              return indexNumber.includes(normalizedIndexSearch);
+            })
+            .map((studentRecord) => ({
+              key: `${record._id}-${studentRecord._id}`,
+              date: record.date,
+              className: record.class,
+              status: studentRecord.status,
+              studentName: studentRecord?.student?.name || "Loading...",
+              indexNumber:
+                studentRecord?.student?.admissionNumber ||
+                studentRecord?.student?.studentId ||
+                "...",
+            }))
+        );
+
   return (
     <Box p={3}>
       <Box
@@ -228,6 +257,67 @@ const Attendance = () => {
             <Button variant="outlined" onClick={handleResetFilters}>
               Reset Filters
             </Button>
+          </Box>
+        </Paper>
+      )}
+
+      {/* Student Attendance Lookup */}
+      {user?.role !== "student" && (
+        <Paper sx={{ p: 2, mb: 2 }}>
+          <Box display="flex" flexDirection="column" gap={2}>
+            <Typography variant="subtitle1" fontWeight={600}>
+              Search Student Attendance by Index Number
+            </Typography>
+            <TextField
+              label="Student Index Number"
+              size="small"
+              value={studentIndexSearch}
+              onChange={(e) => setStudentIndexSearch(e.target.value)}
+              placeholder="Type index number (e.g., 2408A12)"
+              sx={{ maxWidth: 320 }}
+            />
+
+            {normalizedIndexSearch && (
+              studentAttendanceLookup.length === 0 ? (
+                <Typography color="text.secondary" variant="body2">
+                  No attendance records found for index number "{studentIndexSearch.trim()}".
+                </Typography>
+              ) : (
+                <TableContainer>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Date</TableCell>
+                        <TableCell>Class</TableCell>
+                        <TableCell>Student</TableCell>
+                        <TableCell>Index Number</TableCell>
+                        <TableCell align="center">Status</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {studentAttendanceLookup.map((entry) => (
+                        <TableRow key={entry.key}>
+                          <TableCell>{new Date(entry.date).toLocaleDateString()}</TableCell>
+                          <TableCell>{entry.className}</TableCell>
+                          <TableCell>{entry.studentName}</TableCell>
+                          <TableCell>{entry.indexNumber}</TableCell>
+                          <TableCell align="center">
+                            <Chip
+                              label={
+                                entry.status.charAt(0).toUpperCase() +
+                                entry.status.slice(1)
+                              }
+                              color={getStatusColor(entry.status)}
+                              size="small"
+                            />
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              )
+            )}
           </Box>
         </Paper>
       )}
