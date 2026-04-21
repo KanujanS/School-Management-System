@@ -9,16 +9,13 @@ import {
   PlusIcon,
   CheckCircleIcon,
   XCircleIcon,
-  XMarkIcon,
-  EyeIcon,
-  EyeSlashIcon
+  XMarkIcon
 } from '@heroicons/react/24/outline';
 
 const AddStaffModal = ({ onClose, onSubmit }) => {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    password: '',
     staffType: 'teaching' // Default to teaching staff
   });
 
@@ -71,19 +68,6 @@ const AddStaffModal = ({ onClose, onSubmit }) => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700">Password</label>
-            <input
-              type="password"
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              required
-              minLength={6}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-900 focus:ring-red-900 sm:text-sm"
-            />
-          </div>
-
-          <div>
             <label className="block text-sm font-medium text-gray-700">Staff Type</label>
             <select
               name="staffType"
@@ -114,27 +98,6 @@ const AddStaffModal = ({ onClose, onSubmit }) => {
           </div>
         </form>
       </div>
-    </div>
-  );
-};
-
-const PasswordField = ({ password }) => {
-  const [showPassword, setShowPassword] = useState(false);
-
-  return (
-    <div className="flex items-center space-x-2">
-      <span className="font-mono">{showPassword ? password : '••••••'}</span>
-      <button
-        type="button"
-        onClick={() => setShowPassword(!showPassword)}
-        className="text-gray-500 hover:text-gray-700"
-      >
-        {showPassword ? (
-          <EyeSlashIcon className="w-5 h-5" />
-        ) : (
-          <EyeIcon className="w-5 h-5" />
-        )}
-      </button>
     </div>
   );
 };
@@ -312,9 +275,6 @@ const StaffManagement = () => {
                 Email
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Password
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Staff Type
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -333,9 +293,6 @@ const StaffManagement = () => {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   {staff.email}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <PasswordField password={staff.originalPassword || 'Not available'} />
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap capitalize">
                   {staff.staffType || 'N/A'}

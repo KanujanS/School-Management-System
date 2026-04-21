@@ -9,7 +9,6 @@ import {
 import { FaUserGraduate } from 'react-icons/fa';
 import { studentAPI } from '../../services/api';
 import toast from 'react-hot-toast';
-import PasswordField from '../../components/PasswordField';
 
 // Helper function to generate a random password
 const generatePassword = () => {
@@ -338,7 +337,7 @@ const ClassDetails = () => {
                   Parent Details
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Email & Password
+                  Email
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
@@ -367,7 +366,6 @@ const ClassDetails = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900">{student.email}</div>
-                    <PasswordField password={student.password || 'Not available'} className="text-sm" />
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <button
