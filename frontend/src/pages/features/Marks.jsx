@@ -14,6 +14,7 @@ const Marks = () => {
   const [marks, setMarks] = useState([]);
   const [selectedClass, setSelectedClass] = useState('all');
   const [selectedTerm, setSelectedTerm] = useState('all');
+  const [indexNumberFilter, setIndexNumberFilter] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
@@ -228,6 +229,10 @@ const Marks = () => {
     setSelectedTerm(e.target.value);
   };
 
+  const handleIndexNumberFilterChange = (e) => {
+    setIndexNumberFilter(e.target.value);
+  };
+
   const handleAddMarks = async (data) => {
     if (data) {
       setShowAddModal(false);
@@ -439,6 +444,11 @@ const Marks = () => {
   }
 
   // Staff/Admin view remains the same
+  const normalizedIndexFilter = indexNumberFilter.trim().toLowerCase();
+  const filteredStudentTermRows = studentTermRows.filter((row) =>
+    String(row.indexNumber || '').toLowerCase().includes(normalizedIndexFilter)
+  );
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8 flex justify-between items-center">
@@ -454,7 +464,7 @@ const Marks = () => {
         )}
       </div>
 
-      <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700">Class</label>
           <select
@@ -493,6 +503,17 @@ const Marks = () => {
             ))}
           </select>
         </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Index Number</label>
+          <input
+            type="text"
+            value={indexNumberFilter}
+            onChange={handleIndexNumberFilterChange}
+            placeholder="Search by index number"
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-900 focus:ring-red-900 sm:text-sm"
+          />
+        </div>
       </div>
 
       {/* Loading and Error States */}
@@ -519,9 +540,10 @@ const Marks = () => {
       {/* Results Summary */}
       {!isLoading && !error && (
         <div className="mb-4 text-sm text-gray-600">
-          Showing {studentTermRows.length} term entr{studentTermRows.length === 1 ? 'y' : 'ies'}
+          Showing {filteredStudentTermRows.length} term entr{filteredStudentTermRows.length === 1 ? 'y' : 'ies'}
           {selectedClass !== 'all' && ` in ${selectedClass}`}
           {selectedTerm !== 'all' && ` for ${selectedTerm}`}
+          {indexNumberFilter.trim() && ` matching index "${indexNumberFilter.trim()}"`}
         </div>
       )}
 
@@ -548,7 +570,7 @@ const Marks = () => {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {studentTermRows.map((student) => (
+            {filteredStudentTermRows.map((student) => (
               <tr key={student.id}>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{student.name}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{student.indexNumber}</td>
