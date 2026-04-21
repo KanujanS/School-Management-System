@@ -15,6 +15,8 @@ const Assignments = () => {
   const { user, logout, isAuthenticated, isTokenValid } = useAuth();
   const navigate = useNavigate();
   const [assignments, setAssignments] = useState([]);
+  const [selectedClass, setSelectedClass] = useState('all');
+  const [selectedSubject, setSelectedSubject] = useState('all');
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedAssignment, setSelectedAssignment] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -136,6 +138,44 @@ const Assignments = () => {
     setShowAddModal(false);
   };
 
+  const normalizeClassName = (value) =>
+    String(value || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[\s_]+/g, '-')
+      .replace(/-+/g, '-');
+
+  const formatLabel = (value) =>
+    String(value || '')
+      .split('-')
+      .map((part) => {
+        if (part.toLowerCase() === 'a/l') return 'A/L';
+        return part.charAt(0).toUpperCase() + part.slice(1);
+      })
+      .join('-');
+
+  const filteredAssignments = assignments.filter((assignment) => {
+    const matchesClass =
+      selectedClass === 'all' ||
+      normalizeClassName(assignment.class) === normalizeClassName(selectedClass);
+    const matchesSubject =
+      selectedSubject === 'all' ||
+      String(assignment.subject || '').toLowerCase() === selectedSubject;
+
+    return matchesClass && matchesSubject;
+  });
+
+  const availableClasses = Array.from(new Set(assignments.map((assignment) => assignment.class).filter(Boolean)))
+    .sort((a, b) => a.localeCompare(b));
+
+  const availableSubjects = Array.from(new Set(assignments.map((assignment) => assignment.subject).filter(Boolean)))
+    .sort((a, b) => a.localeCompare(b));
+
+  const handleResetFilters = () => {
+    setSelectedClass('all');
+    setSelectedSubject('all');
+  };
+
   const handleSubmitAssignment = async (assignmentData) => {
     if (!isTokenValid()) {
       logout(true);
@@ -212,6 +252,52 @@ const Assignments = () => {
       )}
 
       {/* Assignments list */}
+      {(user?.role === 'staff' || user?.role === 'admin') && (
+        <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4 bg-white rounded-lg shadow p-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Filter by Class</label>
+            <select
+              value={selectedClass}
+              onChange={(e) => setSelectedClass(e.target.value)}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-900 focus:ring-red-900 sm:text-sm"
+            >
+              <option value="all">All Classes</option>
+              {availableClasses.map((className) => (
+                <option key={className} value={className}>
+                  {formatLabel(className)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Filter by Subject</label>
+            <select
+              value={selectedSubject}
+              onChange={(e) => setSelectedSubject(e.target.value)}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-900 focus:ring-red-900 sm:text-sm"
+            >
+              <option value="all">All Subjects</option>
+              {availableSubjects.map((subject) => (
+                <option key={subject} value={String(subject).toLowerCase()}>
+                  {subject}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-end">
+            <button
+              type="button"
+              onClick={handleResetFilters}
+              className="w-full px-4 py-2 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              Reset Filters
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
@@ -228,14 +314,14 @@ const Assignments = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {assignments.length === 0 ? (
+              {filteredAssignments.length === 0 ? (
                 <tr>
                   <td colSpan="6" className="px-6 py-4 text-center text-gray-500">
-                    No assignments found
+                    No assignments found for the selected filters
                   </td>
                 </tr>
               ) : (
-                assignments.map((assignment) => (
+                filteredAssignments.map((assignment) => (
                   <tr key={assignment._id}>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">{assignment.title}</div>
