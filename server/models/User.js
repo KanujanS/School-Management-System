@@ -57,11 +57,20 @@ const userSchema = new mongoose.Schema({
       validator: function(v) {
         if (!v) return false;
         v = v.trim();
-        // For O/L students: 4-digit number (e.g., 6001)
-        // For A/L students: subject code + 3 digits (e.g., PS001, AR001)
-        return /^\d{4}$/.test(v) || /^(PS|BS|AR|CM|ET|BT)\d{3}$/.test(v);
+        // Legacy support:
+        // - O/L: 4 digits (e.g., 6001)
+        // - A/L: subject code + 3 digits (e.g., PS001)
+        // New support:
+        // - O/L: YYGCLXX (e.g., 2408A12)
+        // - A/L: YYALSTREAMXX (e.g., 23ALSCI05)
+        return (
+          /^\d{4}$/.test(v) ||
+          /^(PS|BS|AR|CM|CO|ET|BT|SCI)\d{3}$/.test(v) ||
+          /^\d{4}[A-Z]\d{2}$/.test(v) ||
+          /^\d{2}AL(PS|BS|CO|AR|BT|ET|SCI)\d{2}$/.test(v)
+        );
       },
-      message: props => `${props.value} is not a valid student ID format! Use 4 digits for O/L or [SubjectCode][3 digits] for A/L`
+      message: props => `${props.value} is not a valid student ID format! Use YYGCLXX for O/L or YYALSTREAMXX for A/L`
     }
   },
   admissionNumber: {
@@ -75,11 +84,20 @@ const userSchema = new mongoose.Schema({
       validator: function(v) {
         if (!v) return false;
         v = v.trim();
-        // For O/L students: 4-digit number (e.g., 6001)
-        // For A/L students: subject code + 3 digits (e.g., PS001, AR001)
-        return /^\d{4}$/.test(v) || /^(PS|BS|AR|CM|ET|BT)\d{3}$/.test(v);
+        // Legacy support:
+        // - O/L: 4 digits (e.g., 6001)
+        // - A/L: subject code + 3 digits (e.g., PS001)
+        // New support:
+        // - O/L: YYGCLXX (e.g., 2408A12)
+        // - A/L: YYALSTREAMXX (e.g., 23ALSCI05)
+        return (
+          /^\d{4}$/.test(v) ||
+          /^(PS|BS|AR|CM|CO|ET|BT|SCI)\d{3}$/.test(v) ||
+          /^\d{4}[A-Z]\d{2}$/.test(v) ||
+          /^\d{2}AL(PS|BS|CO|AR|BT|ET|SCI)\d{2}$/.test(v)
+        );
       },
-      message: props => `${props.value} is not a valid admission number format! Use 4 digits for O/L or [SubjectCode][3 digits] for A/L`
+      message: props => `${props.value} is not a valid admission number format! Use YYGCLXX for O/L or YYALSTREAMXX for A/L`
     }
   },
   class: {

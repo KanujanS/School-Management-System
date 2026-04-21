@@ -736,6 +736,9 @@ export const studentAPI = {
         error: error.message,
         response: error.response?.data,
       });
+      if (Array.isArray(error.response?.data?.errors) && error.response.data.errors.length > 0) {
+        throw new Error(error.response.data.errors.join(", "));
+      }
       if (error.response?.data?.message) {
         throw new Error(error.response.data.message);
       }
