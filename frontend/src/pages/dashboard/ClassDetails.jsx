@@ -23,6 +23,15 @@ const generatePassword = () => {
   return password;
 };
 
+const streamCodeMap = {
+  'physical-science': 'PS',
+  'biological-science': 'BS',
+  'commerce': 'CO',
+  'arts': 'AR',
+  'bio-technology': 'BT',
+  'engineering-technology': 'ET'
+};
+
 const ClassDetails = () => {
   const { gradeId, division, stream } = useParams();
   const navigate = useNavigate();
@@ -58,17 +67,42 @@ const ClassDetails = () => {
     name: 'Unknown Stream'
   }) : null;
 
-  const [newStudent, setNewStudent] = useState({
+  const getSuggestedAdmissionNumber = (studentsList = students) => {
+    const yearCode = new Date().getFullYear().toString().slice(-2);
+
+    const prefix = stream
+      ? `${yearCode}AL${streamCodeMap[stream] || 'SCI'}`
+      : `${yearCode}${String(gradeId || '').padStart(2, '0')}${String(division || '').toUpperCase()}`;
+
+    const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const serialPattern = new RegExp(`^${escapedPrefix}(\\d{2})$`, 'i');
+
+    const nextSerial = (studentsList || []).reduce((max, student) => {
+      const admission = String(student?.admissionNumber || '').trim();
+      const match = admission.match(serialPattern);
+      if (!match) return max;
+
+      const serial = Number(match[1]);
+      if (Number.isNaN(serial)) return max;
+      return Math.max(max, serial);
+    }, 0) + 1;
+
+    return `${prefix}${String(nextSerial).padStart(2, '0')}`;
+  };
+
+  const getInitialStudentState = (admissionNumber = '') => ({
     name: '',
-    admissionNumber: '',
+    admissionNumber,
     gender: 'Male',
     dateOfBirth: '',
     address: '',
     parentName: '',
     contactNumber: '',
     email: '',
-    password: generatePassword() // Generate initial password
+    password: generatePassword()
   });
+
+  const [newStudent, setNewStudent] = useState(getInitialStudentState());
 
   useEffect(() => {
     const fetchStudents = async () => {
@@ -211,17 +245,12 @@ const ClassDetails = () => {
 
   const handleCloseModal = () => {
     setShowAddStudentModal(false);
-    setNewStudent({
-      name: '',
-      admissionNumber: '',
-      gender: 'Male',
-      dateOfBirth: '',
-      address: '',
-      parentName: '',
-      contactNumber: '',
-      email: '',
-      password: generatePassword() // Generate new password for next student
-    });
+    setNewStudent(getInitialStudentState());
+  };
+
+  const handleOpenAddStudentModal = () => {
+    setNewStudent(getInitialStudentState(getSuggestedAdmissionNumber()));
+    setShowAddStudentModal(true);
   };
 
   if (loading) {
@@ -273,7 +302,7 @@ const ClassDetails = () => {
             </p>
           </div>
           <button
-            onClick={() => setShowAddStudentModal(true)}
+            onClick={handleOpenAddStudentModal}
             className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-900 hover:bg-red-800"
           >
             <UserPlusIcon className="h-5 w-5 mr-2" />
@@ -394,6 +423,9 @@ const ClassDetails = () => {
                   required
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-900 focus:ring-red-900 sm:text-sm"
                 />
+                <p className="mt-1 text-xs text-gray-500">
+                  Format: {stream ? 'YYALSTREAMXX (e.g., 23ALSCI05)' : 'YYGCLXX (e.g., 2408A12)'}
+                </p>
               </div>
 
               <div>
