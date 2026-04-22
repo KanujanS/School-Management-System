@@ -31,8 +31,23 @@ app.use((req, res, next) => {
 });
 
 // CORS Configuration
+const isAllowedOrigin = (origin) => {
+  if (!origin) return true;
+
+  // Allow local development and deployed frontends without hardcoding one exact domain.
+  const localhostPattern = /^http:\/\/localhost:\d+$/;
+  const vercelPattern = /^https:\/\/[a-zA-Z0-9-]+\.vercel\.app$/;
+
+  return localhostPattern.test(origin) || vercelPattern.test(origin);
+};
+
 const corsOptions = {
-  origin: 'http://localhost:5173',
+  origin: (origin, callback) => {
+    if (isAllowedOrigin(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error('Not allowed by CORS'));
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization'],
   credentials: true
@@ -60,7 +75,13 @@ app.use('/api/notifications', notificationRoutes);
 
 // Serve static files from the uploads directory with proper CORS and security headers
 app.use('/uploads', (req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', 'http://localhost:5173');
+  const requestOrigin = req.headers.origin;
+
+  if (isAllowedOrigin(requestOrigin) && requestOrigin) {
+    res.setHeader('Access-Control-Allow-Origin', requestOrigin);
+    res.setHeader('Vary', 'Origin');
+  }
+
   res.setHeader('Access-Control-Allow-Methods', 'GET');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   next();
