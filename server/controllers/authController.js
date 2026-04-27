@@ -370,7 +370,7 @@ export const getAllStaff = async (req, res) => {
 // @access  Private/Admin
 export const updateStaff = async (req, res) => {
   try {
-    const { name, email, staffType, department, isActive } = req.body;
+    const { name, email, staffType, department, contactNumber, isActive } = req.body;
     const staffId = req.params.id;
 
     // Find staff member
@@ -387,6 +387,7 @@ export const updateStaff = async (req, res) => {
     if (email) staff.email = email;
     if (staffType) staff.staffType = staffType;
     if (department) staff.department = department;
+    if (typeof contactNumber === 'string') staff.contactNumber = contactNumber;
     if (typeof isActive === 'boolean') staff.isActive = isActive;
 
     // Save changes
@@ -511,7 +512,7 @@ export const getDashboardStats = async (req, res) => {
 // @access  Private/Admin
 export const createStaff = async (req, res) => {
   try {
-    const { name, email, password, staffType, department } = req.body;
+    const { name, email, password, staffType, department, contactNumber } = req.body;
 
     // Validate required fields
     if (!name || !email || !password || !staffType) {
@@ -537,7 +538,8 @@ export const createStaff = async (req, res) => {
       password,
       role: 'staff',
       staffType,
-      department: department || staffType // Use staffType as department if not provided
+      department: department || staffType, // Use staffType as department if not provided
+      contactNumber
     });
 
     // Get the staff member with original password

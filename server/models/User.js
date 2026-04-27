@@ -45,6 +45,10 @@ const userSchema = new mongoose.Schema({
       return this.staffType; // Default to staffType if not provided
     }
   },
+  contactNumber: {
+    type: String,
+    trim: true
+  },
   // Student specific fields
   studentId: {
     type: String,

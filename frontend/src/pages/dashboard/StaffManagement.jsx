@@ -12,11 +12,22 @@ import {
   XMarkIcon
 } from '@heroicons/react/24/outline';
 
+const generateRandomPassword = (length = 10) => {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%';
+  let password = '';
+  for (let i = 0; i < length; i += 1) {
+    password += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return password;
+};
+
 const AddStaffModal = ({ onClose, onSubmit }) => {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    staffType: 'teaching' // Default to teaching staff
+    contactNumber: '',
+    staffType: 'teaching',
+    password: generateRandomPassword()
   });
 
   const handleChange = (e) => {
@@ -81,6 +92,44 @@ const AddStaffModal = ({ onClose, onSubmit }) => {
             </select>
           </div>
 
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Contact Number</label>
+            <input
+              type="tel"
+              name="contactNumber"
+              value={formData.contactNumber}
+              onChange={handleChange}
+              required
+              placeholder="e.g. 0771234567"
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-900 focus:ring-red-900 sm:text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Generated Password</label>
+            <div className="mt-1 flex gap-2">
+              <input
+                type="text"
+                name="password"
+                value={formData.password}
+                readOnly
+                className="block w-full rounded-md border-gray-300 bg-gray-50 shadow-sm focus:border-red-900 focus:ring-red-900 sm:text-sm"
+              />
+              <button
+                type="button"
+                onClick={() =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    password: generateRandomPassword()
+                  }))
+                }
+                className="px-3 py-2 text-sm font-medium text-red-900 border border-red-900 rounded-md hover:bg-red-50"
+              >
+                Regenerate
+              </button>
+            </div>
+          </div>
+
           <div className="flex justify-end space-x-3 mt-6">
             <button
               type="button"
@@ -94,6 +143,136 @@ const AddStaffModal = ({ onClose, onSubmit }) => {
               className="px-4 py-2 text-sm font-medium text-white bg-red-900 rounded-md hover:bg-red-800"
             >
               Add Staff
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+const EditStaffModal = ({ staff, onClose, onSubmit }) => {
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    staffType: 'teaching',
+    contactNumber: '',
+    isActive: true
+  });
+
+  useEffect(() => {
+    if (staff) {
+      setFormData({
+        name: staff.name || '',
+        email: staff.email || '',
+        staffType: staff.staffType || 'teaching',
+        contactNumber: staff.contactNumber || '',
+        isActive: typeof staff.isActive === 'boolean' ? staff.isActive : true
+      });
+    }
+  }, [staff]);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: name === 'isActive' ? value === 'true' : value
+    }));
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onSubmit(staff._id, formData);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+      <div className="relative top-20 mx-auto p-5 w-96 shadow-lg rounded-md bg-white">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">Edit Staff Member</h3>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+            <XMarkIcon className="h-6 w-6" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Full Name</label>
+            <input
+              type="text"
+              name="name"
+              value={formData.name}
+              onChange={handleChange}
+              required
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-900 focus:ring-red-900 sm:text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Email</label>
+            <input
+              type="email"
+              name="email"
+              value={formData.email}
+              onChange={handleChange}
+              required
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-900 focus:ring-red-900 sm:text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Staff Type</label>
+            <select
+              name="staffType"
+              value={formData.staffType}
+              onChange={handleChange}
+              required
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-900 focus:ring-red-900 sm:text-sm"
+            >
+              <option value="teaching">Teaching Staff</option>
+              <option value="support">Support Staff</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Contact Number</label>
+            <input
+              type="tel"
+              name="contactNumber"
+              value={formData.contactNumber}
+              onChange={handleChange}
+              required
+              placeholder="e.g. 0771234567"
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-900 focus:ring-red-900 sm:text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Status</label>
+            <select
+              name="isActive"
+              value={String(formData.isActive)}
+              onChange={handleChange}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-900 focus:ring-red-900 sm:text-sm"
+            >
+              <option value="true">Active</option>
+              <option value="false">Inactive</option>
+            </select>
+          </div>
+
+          <div className="flex justify-end space-x-3 mt-6">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 text-sm font-medium text-white bg-red-900 rounded-md hover:bg-red-800"
+            >
+              Update Staff
             </button>
           </div>
         </form>
@@ -278,6 +457,9 @@ const StaffManagement = () => {
                 Staff Type
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Contact Number
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Status
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -298,6 +480,9 @@ const StaffManagement = () => {
                   {staff.staffType || 'N/A'}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
+                  {staff.contactNumber || 'N/A'}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                     staff.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                   }`}>
@@ -315,6 +500,13 @@ const StaffManagement = () => {
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                  <button
+                    onClick={() => setSelectedStaff(staff)}
+                    className="text-blue-600 hover:text-blue-900"
+                    title="Edit Staff"
+                  >
+                    <PencilIcon className="w-5 h-5" />
+                  </button>
                   {staff.isActive ? (
                     <button
                       onClick={() => handleRemoveStaff(staff._id)}
@@ -355,6 +547,14 @@ const StaffManagement = () => {
         <AddStaffModal
           onClose={() => setShowAddStaffModal(false)}
           onSubmit={handleAddStaff}
+        />
+      )}
+
+      {selectedStaff && (
+        <EditStaffModal
+          staff={selectedStaff}
+          onClose={() => setSelectedStaff(null)}
+          onSubmit={handleUpdateStaff}
         />
       )}
     </div>
