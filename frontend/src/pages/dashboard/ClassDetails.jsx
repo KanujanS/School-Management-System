@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { 
   UserPlusIcon, 
   TrashIcon,
+  PencilIcon,
   XMarkIcon,
   ArrowLeftIcon
 } from '@heroicons/react/24/outline';
@@ -38,6 +39,7 @@ const ClassDetails = () => {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [selectedStudent, setSelectedStudent] = useState(null);
 
   // Stream information mapping for A/L streams
   const streamInfo = {
@@ -368,12 +370,22 @@ const ClassDetails = () => {
                     <div className="text-sm text-gray-900">{student.email}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <button
-                      onClick={() => handleDeleteStudent(student._id)}
-                      className="text-red-900 hover:text-red-800"
-                    >
-                      <TrashIcon className="h-5 w-5" />
-                    </button>
+                    <div className="flex items-center space-x-3">
+                      <button
+                        onClick={() => setSelectedStudent(student)}
+                        className="text-blue-600 hover:text-blue-900 cursor-pointer"
+                        title="Edit Student"
+                      >
+                        <PencilIcon className="h-5 w-5" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteStudent(student._id)}
+                        className="text-red-900 hover:text-red-800 cursor-pointer"
+                        title="Delete Student"
+                      >
+                        <TrashIcon className="h-5 w-5" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -547,7 +559,112 @@ const ClassDetails = () => {
           </div>
         </div>
       )}
+
+      {/* Edit Student Modal */}
+      {selectedStudent && (
+        <div className="fixed inset-0 bg-black/50  bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 w-96 shadow-lg rounded-md bg-white">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Edit Student</h3>
+              <button 
+                onClick={() => setSelectedStudent(null)}
+                className="text-gray-500 hover:text-gray-700 cursor-pointer"
+              >
+                <XMarkIcon className="h-6 w-6" />
+              </button>
+            </div>
+
+            <EditStudentForm
+              student={selectedStudent}
+              onCancel={() => setSelectedStudent(null)}
+              onSaved={(updated) => {
+                // Replace in list
+                setStudents((prev) => prev.map(s => s._id === updated._id ? updated : s));
+                setSelectedStudent(null);
+                toast.success('Student updated successfully');
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
+  );
+};
+
+const EditStudentForm = ({ student, onCancel, onSaved }) => {
+  const [form, setForm] = useState({
+    name: student.name || '',
+    admissionNumber: student.admissionNumber || '',
+    gender: student.gender || 'Male',
+    dateOfBirth: student.dateOfBirth ? new Date(student.dateOfBirth).toISOString().slice(0,10) : '',
+    address: student.address || '',
+    parentName: student.parentName || '',
+    contactNumber: student.contactNumber || '',
+    email: student.email || ''
+  });
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setForm(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      // Basic validation
+      if (!form.name || !form.admissionNumber || !form.contactNumber || !form.parentName || !form.email) {
+        throw new Error('Please fill required fields');
+      }
+
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(form.email)) {
+        throw new Error('Please enter a valid email address');
+      }
+
+      const resp = await studentAPI.updateStudent(student._id, form);
+      if (resp.success) {
+        onSaved(resp.data);
+      } else {
+        throw new Error(resp.message || 'Failed to update');
+      }
+    } catch (err) {
+      console.error('Error updating student:', err);
+      toast.error(err.message || 'Failed to update student');
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <label className="block text-sm font-medium text-gray-700">Full Name</label>
+        <input name="name" value={form.name} onChange={handleChange} required className="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm" />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700">Admission Number</label>
+        <input name="admissionNumber" value={form.admissionNumber} onChange={handleChange} required className="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm" />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700">Parent Name</label>
+        <input name="parentName" value={form.parentName} onChange={handleChange} required className="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm" />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700">Contact Number</label>
+        <input name="contactNumber" value={form.contactNumber} onChange={handleChange} required className="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm" />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700">Email</label>
+        <input type="email" name="email" value={form.email} onChange={handleChange} required className="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm" />
+      </div>
+
+      <div className="flex justify-end space-x-3 mt-6">
+        <button type="button" onClick={onCancel} className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 cursor-pointer">Cancel</button>
+        <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-red-900 rounded-md hover:bg-red-800 cursor-pointer">Update</button>
+      </div>
+    </form>
   );
 };
 

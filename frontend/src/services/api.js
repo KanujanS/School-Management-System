@@ -805,6 +805,20 @@ export const studentAPI = {
       throw error;
     }
   },
+  updateStudent: async (studentId, studentData) => {
+    try {
+      // Normalize class/stream if present
+      const normalizedData = { ...studentData };
+      if (normalizedData.class) normalizedData.class = normalizedData.class.replace(/\s+/g, "-");
+      if (normalizedData.stream) normalizedData.stream = normalizedData.stream.replace(/\s+/g, "-");
+
+      const response = await api.put(`/api/students/${studentId}`, normalizedData);
+      return response.data;
+    } catch (error) {
+      console.error("Error updating student:", error);
+      throw error;
+    }
+  },
 };
 
 // User API

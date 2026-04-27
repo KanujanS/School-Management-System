@@ -325,13 +325,21 @@ export const addStudent = asyncHandler(async (req, res) => {
 // @access  Private
 export const updateStudent = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const updateData = req.body;
+  const updateData = { ...req.body };
 
   // Check if student exists
   const student = await Student.findById(id);
   if (!student) {
     res.status(404);
     throw new Error('Student not found');
+  }
+
+  if (typeof updateData.email === 'string') {
+    updateData.email = updateData.email.trim().toLowerCase();
+  }
+
+  if (typeof updateData.admissionNumber === 'string') {
+    updateData.admissionNumber = updateData.admissionNumber.trim();
   }
 
   // If updating admission number, check if it's unique
@@ -341,12 +349,22 @@ export const updateStudent = asyncHandler(async (req, res) => {
       res.status(400);
       throw new Error('Student with this admission number already exists');
     }
+
+    const existingUserAdmission = await User.findOne({ admissionNumber: updateData.admissionNumber });
+    if (existingUserAdmission) {
+      res.status(400);
+      throw new Error('Student with this admission number already exists');
+    }
   }
 
   // If updating email, check if it's unique
   if (updateData.email && updateData.email !== student.email) {
-    const existingEmail = await Student.findOne({ email: updateData.email });
-    if (existingEmail) {
+    const [existingStudentEmail, existingUserEmail] = await Promise.all([
+      Student.findOne({ email: updateData.email }),
+      User.findOne({ email: updateData.email })
+    ]);
+
+    if ((existingStudentEmail && existingStudentEmail._id.toString() !== id) || existingUserEmail) {
       res.status(400);
       throw new Error('Student with this email already exists');
     }
@@ -362,6 +380,26 @@ export const updateStudent = asyncHandler(async (req, res) => {
     updateData,
     { new: true, runValidators: true }
   ).select('-password');
+
+  const userUpdateData = {};
+  if (typeof updateData.name === 'string') {
+    userUpdateData.name = updateData.name.trim();
+  }
+  if (typeof updateData.email === 'string') {
+    userUpdateData.email = updateData.email;
+  }
+  if (typeof updateData.admissionNumber === 'string') {
+    userUpdateData.admissionNumber = updateData.admissionNumber;
+    userUpdateData.studentId = updateData.admissionNumber;
+  }
+
+  if (Object.keys(userUpdateData).length > 0) {
+    await User.findOneAndUpdate(
+      { admissionNumber: student.admissionNumber },
+      userUpdateData,
+      { new: true, runValidators: true }
+    );
+  }
 
   res.json({
     success: true,

@@ -186,7 +186,7 @@ const ClassDetails = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <button
                       onClick={() => handleDeleteStudent(student._id)}
-                      className="text-red-900 hover:text-red-800"
+                      className="text-red-900 hover:text-red-800 cursor-pointer"
                     >
                       <TrashIcon className="h-5 w-5" />
                     </button>
