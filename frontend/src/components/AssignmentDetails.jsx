@@ -87,7 +87,7 @@ const AssignmentDetails = ({ assignment, onClose }) => {
           </h3>
           <button
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-700"
+            className="text-gray-500 hover:text-gray-700 cursor-pointer"
           >
             <XMarkIcon className="h-6 w-6" />
           </button>
@@ -150,7 +150,7 @@ const AssignmentDetails = ({ assignment, onClose }) => {
                     <button
                       onClick={() => handleDownload(attachment.fileUrl, attachment.fileName)}
                       disabled={downloadingFiles[attachment.fileUrl]}
-                      className={`ml-4 flex-shrink-0 text-sm font-medium ${
+                      className={`ml-4 flex-shrink-0 text-sm font-medium cursor-pointer ${
                         downloadingFiles[attachment.fileUrl]
                           ? 'text-gray-400 cursor-not-allowed'
                           : 'text-red-900 hover:text-red-800'

@@ -456,7 +456,7 @@ const Marks = () => {
         {(user.role === 'staff' || user.role === 'admin') && (
           <button
             onClick={() => setShowAddModal(true)}
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-900 hover:bg-red-800"
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-900 hover:bg-red-800 cursor-pointer"
           >
             <PlusIcon className="h-5 w-5 mr-2" />
             Add Marks

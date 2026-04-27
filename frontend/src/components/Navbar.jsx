@@ -74,7 +74,7 @@ const Navbar = () => {
                   <div className="hidden sm:flex sm:items-center">
                     <button
                       onClick={logout}
-                      className="ml-4 px-4 py-2 text-sm font-medium text-gray-700 hover:text-red-800 hover:bg-gray-100 rounded-md transition-all duration-200 ease-in-out"
+                      className="ml-4 px-4 py-2 text-sm font-medium text-white bg-red-800 hover:bg-red-700 rounded-md transition-all duration-200 ease-in-out cursor-pointer"
                     >
                       Logout
                     </button>

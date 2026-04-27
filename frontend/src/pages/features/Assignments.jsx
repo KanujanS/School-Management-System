@@ -227,7 +227,7 @@ const Assignments = () => {
         {(user?.role === 'staff' || user?.role === 'admin') && (
           <button
             onClick={handleAddAssignment}
-            className="bg-red-800 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors duration-200 flex items-center"
+            className="bg-red-800 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors duration-200 flex items-center cursor-pointer"
           >
             <DocumentPlusIcon className="h-5 w-5 mr-2" />
             Add Assignment
@@ -259,7 +259,7 @@ const Assignments = () => {
             <select
               value={selectedClass}
               onChange={(e) => setSelectedClass(e.target.value)}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-900 focus:ring-red-900 sm:text-sm"
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-900 focus:ring-red-900 sm:text-sm cursor-pointer"
             >
               <option value="all">All Classes</option>
               {availableClasses.map((className) => (
@@ -275,7 +275,7 @@ const Assignments = () => {
             <select
               value={selectedSubject}
               onChange={(e) => setSelectedSubject(e.target.value)}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-900 focus:ring-red-900 sm:text-sm"
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-900 focus:ring-red-900 sm:text-sm cursor-pointer"
             >
               <option value="all">All Subjects</option>
               {availableSubjects.map((subject) => (
@@ -290,7 +290,7 @@ const Assignments = () => {
             <button
               type="button"
               onClick={handleResetFilters}
-              className="w-full px-4 py-2 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
+              className="w-full px-4 py-2 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
             >
               Reset Filters
             </button>
@@ -351,14 +351,14 @@ const Assignments = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <button
                         onClick={() => handleViewAssignment(assignment)}
-                        className="text-blue-600 hover:text-blue-900 mr-4"
+                        className="text-blue-600 hover:text-blue-900 mr-4 cursor-pointer"
                       >
                         <EyeIcon className="h-5 w-5" />
                       </button>
                       {(user?.role === 'staff' || user?.role === 'admin') && (
                         <button
                           onClick={() => handleDeleteAssignment(assignment._id)}
-                          className="text-red-600 hover:text-red-900"
+                          className="text-red-600 hover:text-red-900 cursor-pointer"
                         >
                           <TrashIcon className="h-5 w-5" />
                         </button>

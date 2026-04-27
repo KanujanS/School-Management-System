@@ -345,7 +345,7 @@ const AddMarks = ({ onClose, onAdd, selectedClass: initialClass }) => {
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-gray-600 hover:text-gray-800 rounded-lg transition-colors"
+              className="px-4 py-2 text-gray-600 hover:text-gray-800 rounded-lg transition-colors cursor-pointer"
             >
               Cancel
             </button>
@@ -353,7 +353,7 @@ const AddMarks = ({ onClose, onAdd, selectedClass: initialClass }) => {
               type="button"
               onClick={handleAddMarks}
               disabled={loading}
-              className="px-4 py-2 bg-red-800 text-white rounded-lg hover:bg-red-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 bg-red-800 text-white rounded-lg hover:bg-red-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
               {loading ? (
                 <span className="flex items-center">
