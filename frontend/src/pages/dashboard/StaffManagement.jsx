@@ -48,7 +48,7 @@ const AddStaffModal = ({ onClose, onSubmit }) => {
       <div className="relative top-20 mx-auto p-5 w-96 shadow-lg rounded-md bg-white">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-semibold text-gray-900">Add New Staff Member</h3>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 cursor-pointer">
             <XMarkIcon className="h-6 w-6" />
           </button>
         </div>
@@ -123,7 +123,7 @@ const AddStaffModal = ({ onClose, onSubmit }) => {
                     password: generateRandomPassword()
                   }))
                 }
-                className="px-3 py-2 text-sm font-medium text-red-900 border border-red-900 rounded-md hover:bg-red-50"
+                className="px-3 py-2 text-sm font-medium text-red-900 border border-red-900 rounded-md hover:bg-red-50 cursor-pointer"
               >
                 Regenerate
               </button>
@@ -131,16 +131,16 @@ const AddStaffModal = ({ onClose, onSubmit }) => {
           </div>
 
           <div className="flex justify-end space-x-3 mt-6">
-            <button
+              <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
+              className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 text-sm font-medium text-white bg-red-900 rounded-md hover:bg-red-800"
+              className="px-4 py-2 text-sm font-medium text-white bg-red-900 rounded-md hover:bg-red-800 cursor-pointer"
             >
               Add Staff
             </button>
@@ -190,7 +190,7 @@ const EditStaffModal = ({ staff, onClose, onSubmit }) => {
       <div className="relative top-20 mx-auto p-5 w-96 shadow-lg rounded-md bg-white">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-semibold text-gray-900">Edit Staff Member</h3>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 cursor-pointer">
             <XMarkIcon className="h-6 w-6" />
           </button>
         </div>
@@ -264,13 +264,13 @@ const EditStaffModal = ({ staff, onClose, onSubmit }) => {
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
+              className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 text-sm font-medium text-white bg-red-900 rounded-md hover:bg-red-800"
+              className="px-4 py-2 text-sm font-medium text-white bg-red-900 rounded-md hover:bg-red-800 cursor-pointer"
             >
               Update Staff
             </button>
@@ -404,7 +404,7 @@ const StaffManagement = () => {
           </h1>
           <button
             onClick={() => setShowAddStaffModal(true)}
-            className="bg-red-800 text-white px-4 py-2 rounded-md hover:bg-red-900 transition-colors"
+            className="bg-red-800 text-white px-4 py-2 rounded-md hover:bg-red-900 transition-colors cursor-pointer"
           >
             <PlusIcon className="w-4 h-4 inline-block mr-2" />
             Add Staff
@@ -418,7 +418,7 @@ const StaffManagement = () => {
           </div>
           <button
             onClick={fetchStaffList}
-            className="mt-2 bg-red-800 text-white px-4 py-2 rounded-md hover:bg-red-900 transition-colors"
+            className="mt-2 bg-red-800 text-white px-4 py-2 rounded-md hover:bg-red-900 transition-colors cursor-pointer"
           >
             Try Again
           </button>
@@ -436,7 +436,7 @@ const StaffManagement = () => {
         </h1>
         <button
           onClick={() => setShowAddStaffModal(true)}
-          className="bg-red-800 text-white px-4 py-2 rounded-md hover:bg-red-900 transition-colors"
+          className="bg-red-800 text-white px-4 py-2 rounded-md hover:bg-red-900 transition-colors cursor-pointer"
         >
           <PlusIcon className="w-4 h-4 inline-block mr-2" />
           Add Staff
@@ -502,7 +502,7 @@ const StaffManagement = () => {
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
                   <button
                     onClick={() => setSelectedStaff(staff)}
-                    className="text-blue-600 hover:text-blue-900"
+                    className="text-blue-600 hover:text-blue-900 cursor-pointer"
                     title="Edit Staff"
                   >
                     <PencilIcon className="w-5 h-5" />
@@ -510,7 +510,7 @@ const StaffManagement = () => {
                   {staff.isActive ? (
                     <button
                       onClick={() => handleRemoveStaff(staff._id)}
-                      className="text-red-600 hover:text-red-900"
+                      className="text-red-600 hover:text-red-900 cursor-pointer"
                       title="Remove Staff"
                     >
                       <TrashIcon className="w-5 h-5" />
@@ -518,7 +518,7 @@ const StaffManagement = () => {
                   ) : (
                     <button
                       onClick={() => handleReactivateStaff(staff._id)}
-                      className="text-green-600 hover:text-green-900"
+                      className="text-green-600 hover:text-green-900 cursor-pointer"
                       title="Reactivate Staff"
                     >
                       <CheckCircleIcon className="w-5 h-5" />
@@ -536,7 +536,7 @@ const StaffManagement = () => {
         <div className="mt-6 flex justify-center">
           <button
             onClick={() => setShowAll(!showAll)}
-            className="px-6 py-2 bg-red-800 text-white rounded-md hover:bg-red-900 transition-colors font-medium"
+            className="px-6 py-2 bg-red-800 text-white rounded-md hover:bg-red-900 transition-colors font-medium cursor-pointer"
           >
             {showAll ? 'Show Less' : `Show More (${staffList.length - ITEMS_PER_PAGE} more)`}
           </button>

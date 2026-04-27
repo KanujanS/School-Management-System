@@ -114,7 +114,7 @@ const ClassDetails = () => {
           <div>
             <button
               onClick={() => navigate('/admin')}
-              className="flex items-center text-red-900 hover:text-red-800 mb-4"
+              className="flex items-center text-red-900 hover:text-red-800 mb-4 cursor-pointer"
             >
               <ArrowLeftIcon className="h-5 w-5 mr-2" />
               Back to Dashboard
@@ -128,7 +128,7 @@ const ClassDetails = () => {
           </div>
           <button
             onClick={() => setShowAddStudentModal(true)}
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-900 hover:bg-red-800"
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-900 hover:bg-red-800 cursor-pointer"
           >
             <UserPlusIcon className="h-5 w-5 mr-2" />
             Add Student
@@ -206,7 +206,7 @@ const ClassDetails = () => {
               <h3 className="text-lg font-semibold text-gray-900">Add New Student</h3>
               <button 
                 onClick={handleCloseModal}
-                className="text-gray-500 hover:text-gray-700"
+                className="text-gray-500 hover:text-gray-700 cursor-pointer"
               >
                 <XMarkIcon className="h-6 w-6" />
               </button>
@@ -314,13 +314,13 @@ const ClassDetails = () => {
                 <button
                   type="button"
                   onClick={handleCloseModal}
-                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-900 hover:bg-red-800"
+                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-900 hover:bg-red-800 cursor-pointer"
                 >
                   Add Student
                 </button>
