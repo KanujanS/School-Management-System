@@ -112,7 +112,7 @@ const AddStaffModal = ({ onClose, onSubmit }) => {
                 type="text"
                 name="password"
                 value={formData.password}
-                readOnly
+                onChange={(e) =>setFormData((prev) => ({...prev, password: e.target.value}))}
                 className="block w-full rounded-md border-gray-300 bg-gray-50 shadow-sm focus:border-red-900 focus:ring-red-900 sm:text-sm"
               />
               <button
